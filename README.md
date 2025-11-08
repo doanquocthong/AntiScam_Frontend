@@ -55,21 +55,14 @@
 **Đoàn Quốc Thông**  
 Đại học Giao thông Vận tải  
 Sinh viên CNTT - Đam mê phát triển ứng dụng Android  
-📧 Email: your.email@example.com  
+📧 Email: thongdoan742@gmail.com  
 
 ---
 
-## 📄 Giấy phép
-
-Phát hành theo **MIT License** – bạn có thể sử dụng và chỉnh sửa tự do, miễn ghi nguồn gốc dự án.
-
----
-
-### 💡 Gợi ý mở rộng
+### 💡 Mở rộng
 
 - Tích hợp mô hình AI phân tích nội dung tin nhắn.  
 - Cho phép đồng bộ dữ liệu giữa các thiết bị.  
 - Thêm chức năng đánh giá độ tin cậy của số điện thoại.  
 - Giao diện “Báo cáo cộng đồng” hiển thị các số bị người dùng khác đánh dấu.
 
----
