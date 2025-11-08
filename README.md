@@ -16,31 +16,6 @@
 
 ---
 
-## 🏗️ Kiến trúc dự án
-
-AntiScamApp/
-│
-├── app/
-│ └── src/
-│ ├── main/
-│ │ ├── java/com/example/antiscam/
-│ │ │ ├── model/ # Khai báo entity (CallLog, Message, Report)
-│ │ │ ├── data/ # DAO + Room Database
-│ │ │ ├── ui/ # Giao diện Jetpack Compose
-│ │ │ ├── viewmodel/ # ViewModel xử lý logic
-│ │ │ ├── repository/ # Kết nối Database & API
-│ │ │ └── utils/ # Hàm tiện ích (phân tích, regex, …)
-│ │ └── res/ # Icon, layout, màu sắc, strings
-│ ├── AndroidManifest.xml
-│ └── build.gradle
-│
-└── README.md
-
-yaml
-Sao chép mã
-
----
-
 ## 🧩 Công nghệ sử dụng
 
 | Thành phần | Mô tả |
