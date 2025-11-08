@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-feature
+        android:name="android.hardware.telephony"
+        android:required="false" />
+
+    <!-- Permission to read call log (incoming, outcoming, missed call)-->
+    <uses-permission android:name="android.permission.READ_CALL_LOG"/>
+    <!-- Permission to read phone state (ringing, in-call, caller ID)-->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE"/>
+    <!-- Deprecated since Android 10 (API 29). Use TelephonyCallback or CallScreeningService instead -->
+    <!-- <uses-permission android:name="android.permission.PROCESS_OUTGOING_CALLS"/> -->
+    <!-- Permission to read contact (check if incoming exists in contact list to show caller name)-->
+    <uses-permission android:name="android.permission.READ_CONTACTS"/>
+    <!-- Permission to read sms messages -->
+    <uses-permission android:name="android.permission.READ_SMS"/>
+    <!-- Receive sms mesages -->
+    <uses-permission android:name="android.permission.RECEIVE_SMS"/>
+    <!-- Send sms mesages -->
+    <uses-permission android:name="android.permission.SEND_SMS"/>
+    <!-- Permission to make phone call (allow direct calling from alert screen)-->
+    <uses-permission android:name="android.permission.CALL_PHONE"/>
+    <!-- Permission to display overlay windows on top other apps -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
+    <!-- Permission to run foreground services (keep app active for receive sms or calls everywhen) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.ANSWER_PHONE_CALLS"/>
+    <!-- Permission to manage own calls -->
+    <uses-permission android:name="android.permission.MANAGE_OWN_CALLS"/>
+
+    <application
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.AntiScam">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="AntiCamApp"
+            android:theme="@style/Theme.AntiScam">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Activity hiển thị màn hình cuộc gọi đến -->
+        <activity
+            android:name=".IncomingCallActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AntiScam"
+            android:launchMode="singleTop"
+            android:excludeFromRecents="true"
+            android:showOnLockScreen="true"
+            android:turnScreenOn="true"
+            android:showWhenLocked="true">
+        </activity>
+
+        <!-- Service để chặn và xử lý cuộc gọi đến (Android 10+) -->
+        <service
+            android:name=".services.AntiScamCallScreeningService"
+            android:permission="android.permission.BIND_SCREENING_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.telecom.CallScreeningService" />
+            </intent-filter>
+        </service>
+
+        <!-- Service để quản lý cuộc gọi đang diễn ra -->
+        <service
+            android:name=".services.AntiScamInCallService"
+            android:permission="android.permission.BIND_INCALL_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.telecom.InCallService" />
+            </intent-filter>
+        </service>
+
+        <!-- Intent filter để ứng dụng có thể trở thành ứng dụng gọi mặc định -->
+        <activity-alias
+            android:name=".DialerActivity"
+            android:targetActivity=".MainActivity"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.intent.action.DIAL" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="tel" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.DIAL" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="tel" />
+            </intent-filter>
+        </activity-alias>
+    </application>
+
+</manifest>

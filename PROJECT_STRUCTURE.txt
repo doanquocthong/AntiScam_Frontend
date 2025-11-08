@@ -1,0 +1,59 @@
+AntiScamApp/
+│
+├── app/
+│   ├── build.gradle                        # File cấu hình Gradle cho module app
+│   └── src/
+│       └── main/
+│           ├── AndroidManifest.xml ✅        # Khai báo quyền, Activity, service, receiver
+│           ├── java/com/example/antiscamapp/
+│           │
+│           │   ├── data/                   # Tầng dữ liệu – quản lý dữ liệu thô (API, DB, model)
+│           │   │   ├── model/              # Các lớp mô hình (entity) phản ánh dữ liệu thật
+│           │   │   │   ├── CallLog.kt ✅         # Dữ liệu cuộc gọi (số, thời gian, loại)
+│           │   │   │   ├── Message.kt  ✅        # Dữ liệu tin nhắn (người gửi, nội dung, thời gian)
+│           │   │   │   └── Report.kt   ✅        # Báo cáo người dùng về số/tin nhắn nghi ngờ
+│           │   │   │
+│           │   │   ├── repository/         # Lớp trung gian quản lý dữ liệu từ nhiều nguồn
+│           │   │   │   ├── CallRepository.kt    # Xử lý logic lấy, lưu, kiểm tra dữ liệu cuộc gọi
+│           │   │   │   └── MessageRepository.kt # Xử lý logic lấy, lưu, kiểm tra dữ liệu SMS
+│           │   │   │
+│           │   │   └── network/            # Giao tiếp với backend (Spring Boot)
+│           │   │       ├── ApiService.kt       # Khai báo các endpoint (Retrofit)
+│           │   │       └── RetrofitClient.kt   # Cấu hình Retrofit, base URL, Interceptor
+│           │   │
+│           │   ├── screens/                     # Tầng giao diện người dùng (Jetpack Compose)
+│           │   │   ├── call/               # Màn hình & logic hiển thị danh sách cuộc gọi
+│           │   │   │   ├── CallScreen.kt       # Giao diện chính hiển thị danh sách cuộc gọi
+│           │   │   │   ├── CallItem.kt         # Item Compose riêng cho từng cuộc gọi
+│           │   │   │   └── CallViewModel.kt    # ViewModel xử lý logic của trang cuộc gọi
+│           │   │   │
+│           │   │   ├── message/            # Màn hình & logic hiển thị danh sách tin nhắn
+│           │   │   │   ├── MessageScreen.kt    # Giao diện chính của trang tin nhắn
+│           │   │   │   ├── MessageItem.kt      # Item Compose cho từng tin nhắn
+│           │   │   │   └── MessageViewModel.kt # ViewModel xử lý logic trang tin nhắn
+│           │   │   │
+│           │   │   ├── report/             # Xử lý báo cáo spam/lừa đảo
+│           │   │   │   └── ReportDialog.kt     # Hộp thoại cho phép người dùng gửi báo cáo
+│           │   │   │
+│           │   │   ├── components/         # Các thành phần UI dùng chung (buttons, card, ...)
+│           │   │   │   └── CommonUI.kt         # Thành phần tái sử dụng chung trong toàn app
+│           │   │   │
+│           │   │   └── navigation/         # Điều hướng giữa các màn hình (NavHostController)
+│           │   │       └── NavGraph.kt         # Định nghĩa route cho CallScreen, MessageScreen,...
+│           │   │
+│           │   ├── utils/                  # Hàm tiện ích, xử lý chung
+│           │   │   ├── PermissionsHelper.kt    # Kiểm tra & xin quyền (SMS, CALL, CONTACT,…)
+│           │   │   ├── Constants.kt            # Khai báo các hằng số chung
+│           │   │   └── SmsUtils.kt             # Xử lý parsing tin nhắn, phát hiện từ khóa spam
+│           │   │
+│           │   └── MainActivity.kt         # Activity chính chứa Navigation Host và BottomNav
+│           │
+│           └── res/                        # Tài nguyên UI
+│               ├── layout/                 # (ít dùng vì Compose, nhưng có thể chứa XML service)
+│               ├── values/
+│               │   ├── colors.xml          # Định nghĩa màu
+│               │   ├── strings.xml         # Chuỗi hiển thị trong app
+│               │   └── themes.xml          # Chủ đề (theme) ứng dụng
+│               └── drawable/               # Icon, ảnh minh họa (logo, background)
+│
+└── build.gradle                            # File cấu hình Gradle toàn project
