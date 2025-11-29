@@ -8,15 +8,15 @@ plugins {
 android {
     namespace = "com.example.antiscam"
     compileSdk = 36
-
     defaultConfig {
         applicationId = "com.example.antiscam"
-        minSdk = 24
+        minSdk = 25
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "BASE_URL", "\"https://your-url.ngrok-free.app/\"")
     }
 
     buildTypes {
@@ -37,10 +37,14 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
 dependencies {
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.converter.gson)
+    implementation(libs.okhttp.logging)
     implementation("com.google.accompanist:accompanist-systemuicontroller:0.32.0")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.localbroadcastmanager:localbroadcastmanager:1.1.0")
@@ -55,6 +59,8 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation(libs.androidx.room.common.jvm)
     implementation(libs.androidx.room.ktx)
+    implementation(libs.material3)
+    implementation(libs.androidx.compose.material)
     ksp(libs.androidx.room.compiler)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

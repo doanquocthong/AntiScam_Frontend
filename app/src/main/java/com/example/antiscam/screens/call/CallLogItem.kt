@@ -1,7 +1,5 @@
-package com.example.antiscam.screens.contact
+package com.example.antiscam.screens.call
 
-import android.Manifest
-import android.content.pm.PackageManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -22,13 +20,12 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
 import com.example.antiscam.data.model.GroupedCallLog
 import java.text.SimpleDateFormat
 import java.util.*
 
 @Composable
-fun CallLogItem(groupedCallLog: GroupedCallLog, onCallClick: (String) -> Unit = {}) {
+fun CallLogItem(groupedCallLog: GroupedCallLog, onCallClick: (GroupedCallLog) -> Unit = {}) {
     // Sử dụng màu đã lưu trong groupedCallLog
     val avatarColor = remember(groupedCallLog.avatarColor) {
         if (groupedCallLog.avatarColor != 0) {
@@ -173,9 +170,7 @@ fun CallLogItem(groupedCallLog: GroupedCallLog, onCallClick: (String) -> Unit = 
             tint = Color.White,
             modifier = Modifier
                 .size(26.dp)
-                .clickable {
-                    onCallClick(groupedCallLog.phoneNumber)
-                }
+                .clickable { onCallClick(groupedCallLog) }
         )
     }
 }
@@ -183,7 +178,7 @@ fun CallLogItem(groupedCallLog: GroupedCallLog, onCallClick: (String) -> Unit = 
 private fun formatTimestamp(timestamp: Long): String {
     val now = System.currentTimeMillis()
     val diff = now - timestamp
-    
+
     return when {
         diff < 60 * 1000 -> "Vừa xong"
         diff < 60 * 60 * 1000 -> "${diff / (60 * 1000)} phút trước"
@@ -200,7 +195,7 @@ private fun formatDuration(seconds: Int): String {
     val hours = seconds / 3600
     val minutes = (seconds % 3600) / 60
     val secs = seconds % 60
-    
+
     return when {
         hours > 0 -> String.format("%d:%02d:%02d", hours, minutes, secs)
         minutes > 0 -> String.format("%d:%02d", minutes, secs)

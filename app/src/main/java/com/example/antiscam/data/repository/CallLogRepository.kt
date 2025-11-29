@@ -69,8 +69,11 @@ class CallLogRepository(context: Context) {
         ) {
             return
         }
-        
+
         try {
+            // Xóa hết lịch sử cũ trước khi đồng bộ
+            callLogDao.deleteAllCallLogs()
+
             val resolver = context.contentResolver
             val cursor = resolver.query(
                 SystemCallLog.Calls.CONTENT_URI,
@@ -85,7 +88,7 @@ class CallLogRepository(context: Context) {
                 null,
                 "${SystemCallLog.Calls.DATE} DESC"
             )
-            
+
             val colors = listOf(
                 0xFF3D3B8E,
                 0xFF2C5F2D,
@@ -95,33 +98,33 @@ class CallLogRepository(context: Context) {
                 0xFF9A031E,
                 0xFF364F6B
             )
-            
+
             cursor?.use {
                 val numberIdx = it.getColumnIndexOrThrow(SystemCallLog.Calls.NUMBER)
                 val nameIdx = it.getColumnIndexOrThrow(SystemCallLog.Calls.CACHED_NAME)
                 val typeIdx = it.getColumnIndexOrThrow(SystemCallLog.Calls.TYPE)
                 val dateIdx = it.getColumnIndexOrThrow(SystemCallLog.Calls.DATE)
                 val durationIdx = it.getColumnIndexOrThrow(SystemCallLog.Calls.DURATION)
-                
+
                 val callLogsToInsert = mutableListOf<CallLog>()
-                
+
                 while (it.moveToNext()) {
                     val number = it.getString(numberIdx) ?: continue
                     val name = it.getString(nameIdx)
                     val type = it.getInt(typeIdx)
                     val date = it.getLong(dateIdx)
                     val duration = it.getInt(durationIdx)
-                    
+
                     val callType = when (type) {
                         SystemCallLog.Calls.OUTGOING_TYPE -> "OUTGOING"
                         SystemCallLog.Calls.INCOMING_TYPE -> "INCOMING"
                         SystemCallLog.Calls.MISSED_TYPE -> "MISSED"
                         else -> "OUTGOING"
                     }
-                    
+
                     val colorIndex = number.hashCode().absoluteValue % colors.size
                     val avatarColor = colors[colorIndex].toInt()
-                    
+
                     val callLog = CallLog(
                         phoneNumber = number,
                         contactName = name,
@@ -131,10 +134,10 @@ class CallLogRepository(context: Context) {
                         isScam = false,
                         avatarColor = avatarColor
                     )
-                    
+
                     callLogsToInsert.add(callLog)
                 }
-                
+
                 if (callLogsToInsert.isNotEmpty()) {
                     callLogDao.insertCallLogs(callLogsToInsert)
                     android.util.Log.d("CallLogRepository", "Synced ${callLogsToInsert.size} call logs from system")
@@ -144,5 +147,6 @@ class CallLogRepository(context: Context) {
             android.util.Log.e("CallLogRepository", "Error syncing from system call log", e)
         }
     }
+
 }
 

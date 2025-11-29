@@ -1,5 +1,6 @@
 package com.example.antiscam.screens.navigation
 
+import MessageScreen
 import android.R.attr.layoutDirection
 import androidx.compose.foundation.background
 import androidx.compose.material3.Icon
@@ -19,7 +20,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import com.example.antiscam.screens.contact.ContactScreen
-import com.example.antiscam.screens.message.MessageScreen
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalLayoutDirection
