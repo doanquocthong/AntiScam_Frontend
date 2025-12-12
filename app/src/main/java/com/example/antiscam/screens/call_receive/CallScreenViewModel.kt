@@ -1,4 +1,4 @@
-package com.example.antiscam.screens.call
+package com.example.antiscam.screens.call_receive
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -13,7 +13,8 @@ import kotlinx.coroutines.launch
 
 data class CallScreenUiState(
     val isChecking: Boolean = false,
-    val scamInfo: ScamCheckResponse? = null
+    val scamInfo: ScamCheckResponse? = null,
+    val errorMessage: String? = null
 )
 
 class CallScreenViewModel(
@@ -25,16 +26,42 @@ class CallScreenViewModel(
 
     fun loadScamInfo(phoneNumber: String) {
         if (phoneNumber.isBlank()) {
-            _uiState.update { it.copy(scamInfo = null, isChecking = false) }
+            _uiState.update { it.copy(scamInfo = null, isChecking = false, errorMessage = null) }
             return
         }
         viewModelScope.launch {
-            _uiState.update { it.copy(isChecking = true) }
+            _uiState.update { it.copy(isChecking = true, errorMessage = null) }
             val response = scamCheckRepository.checkPhoneNumber(phoneNumber)
+
+            //Backend không trả dữ liệu gì về
+            if (response == null) {
+                _uiState.update {
+                    it.copy(
+                        isChecking = false,
+                        scamInfo = null,
+                        errorMessage = "Không nhận được phản hồi từ máy chủ"
+                    )
+                }
+                return@launch
+            }
+
+            //Response trả về các mã lỗi
+            if (response.code != 200) {
+                _uiState.update {
+                    it.copy(
+                        isChecking = false,
+                        scamInfo = null,
+                        errorMessage = response.message ?: "Có lỗi xảy ra"
+                    )
+                }
+                return@launch
+            }
+
             _uiState.update {
                 it.copy(
                     isChecking = false,
-                    scamInfo = response
+                    scamInfo = response.data,
+                    errorMessage = null
                 )
             }
         }

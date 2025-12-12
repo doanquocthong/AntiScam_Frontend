@@ -15,7 +15,8 @@ interface CallLogDao {
     
     @Query("SELECT * FROM call_logs WHERE phoneNumber = :phoneNumber ORDER BY timestamp DESC")
     fun getCallLogsByPhoneNumber(phoneNumber: String): Flow<List<CallLog>>
-    
+
+//    Nếu conflict khi thêm dòng mới và bị trùng KEY sẽ REPLACE
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertCallLog(callLog: CallLog)
     

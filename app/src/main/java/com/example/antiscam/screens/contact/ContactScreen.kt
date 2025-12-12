@@ -9,40 +9,15 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -53,10 +28,12 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.antiscam.data.model.PendingCall
+import com.example.antiscam.data.model.enums.ContactTab
 import com.example.antiscam.data.repository.CallLogRepository
 import com.example.antiscam.data.repository.ContactRepository
 import com.example.antiscam.data.repository.ScamCheckRepository
-import com.example.antiscam.screens.call.CallLogItem
+import com.example.antiscam.screens.report.ReportViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -88,51 +65,52 @@ fun ContactScreen() {
             Toast.makeText(context, "Cần quyền truy cập danh bạ", Toast.LENGTH_SHORT).show()
         }
     }
+    val reportViewModel: ReportViewModel = viewModel()
+    val reportUiState by reportViewModel.uiState.collectAsState()
+    var reportDialogVisible by remember { mutableStateOf< String? >(null) }
 
+    //Kiểm tra app mặc định
     LaunchedEffect(Unit) {
         try {
-            val granted = ContextCompat.checkSelfPermission(
+            // Permission Contact
+            val contactGranted = ContextCompat.checkSelfPermission(
                 context,
                 Manifest.permission.READ_CONTACTS
             ) == PackageManager.PERMISSION_GRANTED
-            if (granted) {
+
+            if (contactGranted) {
                 hasContactPermission = true
                 viewModel.loadContacts()
             } else {
                 contactPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
             }
-        } catch (e: Exception) {
-            // Bạn có thể log lỗi hoặc xử lý khác ở đây
-            e.printStackTrace()
-        }
-    }
 
-    LaunchedEffect(Unit) {
-        try {
-            val granted = ContextCompat.checkSelfPermission(
+            // Permission Call Log
+            val callLogGranted = ContextCompat.checkSelfPermission(
                 context,
                 Manifest.permission.READ_CALL_LOG
             ) == PackageManager.PERMISSION_GRANTED
-            if (granted) {
-                viewModel.syncCallLogs(context)
+
+//            if (callLogGranted) {
+//                viewModel.syncCallLogs(context)
+//            }
+
+            // Collect effect
+            viewModel.effects.collect { effect ->
+                when (effect) {
+                    is ContactEffect.StartCall ->
+                        launchCallIntent(context, effect.phoneNumber)
+
+                    is ContactEffect.ShowToast ->
+                        Toast.makeText(context, effect.message, Toast.LENGTH_SHORT).show()
+                }
             }
+
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
 
-    LaunchedEffect(Unit) {
-        try {
-            viewModel.effects.collect { effect ->
-                when (effect) {
-                    is ContactEffect.StartCall -> launchCallIntent(context, effect.phoneNumber)
-                    is ContactEffect.ShowToast -> Toast.makeText(context, effect.message, Toast.LENGTH_SHORT).show()
-                }
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
 
     val callPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -159,8 +137,6 @@ fun ContactScreen() {
             callPermissionLauncher.launch(Manifest.permission.CALL_PHONE)
         }
     }
-
-
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -244,11 +220,64 @@ fun ContactScreen() {
                         if (uiState.filteredCallLogs.isEmpty()) {
                             item { EmptyState("Chưa có lịch sử cuộc gọi") }
                         } else {
-                            items(uiState.filteredCallLogs) { log ->
-                                CallLogItem(
-                                    groupedCallLog = log,
-                                    onCallClick = { handleCallRequest(it.phoneNumber, it.contactName) }
-                                )
+                            if (uiState.todayCallLogs.isNotEmpty()) {
+                                item {
+                                    Text(
+                                        "Hôm nay",
+                                        color = Color.Gray,
+                                        modifier = Modifier.padding(8.dp),
+                                        fontSize = 12.sp
+                                    )
+                                }
+                                items(uiState.todayCallLogs) { log ->
+                                    HistoryContactItem(
+                                        groupedCallLog = log,
+                                        onCallClick = { handleCallRequest(it.phoneNumber, it.contactName)},
+                                        onReportClick = { request ->
+                                            reportViewModel.submitReport(request)
+                                        }
+                                    )
+                                }
+                            }
+
+                            if (uiState.yesterdayCallLogs.isNotEmpty()) {
+                                item {
+                                    Text(
+                                        "Hôm qua",
+                                        color = Color.Gray,
+                                        modifier = Modifier.padding(8.dp),
+                                        fontSize = 12.sp
+                                    )
+                                }
+                                items(uiState.yesterdayCallLogs) { log ->
+                                    HistoryContactItem(
+                                        groupedCallLog = log,
+                                        onCallClick = { handleCallRequest(it.phoneNumber, it.contactName) },
+                                        onReportClick = { request ->
+                                            reportViewModel.submitReport(request)
+                                        }
+                                    )
+                                }
+                            }
+
+                            if (uiState.olderCallLogs.isNotEmpty()) {
+                                item {
+                                    Text(
+                                        "Cũ hơn",
+                                        color = Color.Gray,
+                                        modifier = Modifier.padding(8.dp),
+                                        fontSize = 12.sp
+                                    )
+                                }
+                                items(uiState.olderCallLogs) { log ->
+                                    HistoryContactItem(
+                                        groupedCallLog = log,
+                                        onCallClick = { handleCallRequest(it.phoneNumber, it.contactName) },
+                                        onReportClick = { request ->
+                                            reportViewModel.submitReport(request)
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
@@ -316,7 +345,7 @@ private fun ScamWarningDialog(
         onDismissRequest = onDismiss,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                androidx.compose.material3.Icon(
+                Icon(
                     Icons.Default.Warning,
                     contentDescription = null,
                     tint = Color(0xFFFF453A),
@@ -362,4 +391,3 @@ private fun launchCallIntent(context: Context, phoneNumber: String) {
         Toast.makeText(context, "Không thể thực hiện cuộc gọi", Toast.LENGTH_SHORT).show()
     }
 }
-

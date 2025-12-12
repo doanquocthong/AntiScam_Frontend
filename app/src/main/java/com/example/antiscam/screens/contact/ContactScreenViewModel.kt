@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.antiscam.data.model.Contact
 import com.example.antiscam.data.model.CallLog
 import com.example.antiscam.data.model.GroupedCallLog
+import com.example.antiscam.data.model.enums.ContactTab
 import com.example.antiscam.data.repository.CallLogRepository
 import com.example.antiscam.data.repository.ContactRepository
 import com.example.antiscam.data.repository.ScamCheckRepository
@@ -18,6 +19,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.util.Calendar
 
 class ContactScreenViewModel(
     private val contactRepository: ContactRepository,
@@ -35,7 +37,9 @@ class ContactScreenViewModel(
 
     init {
         observeCallLogs()
+        loadContacts()
     }
+
 
     fun loadContacts() {
         viewModelScope.launch {
@@ -65,25 +69,40 @@ class ContactScreenViewModel(
             state.copy(searchQuery = query).applyFilters()
         }
     }
+    fun addNewCallLog(callLog: CallLog) {
+        viewModelScope.launch {
+            try {
+                callLogRepository.insertCallLog(callLog)
+            } catch (_: Exception) {}
+        }
+    }
 
     fun onTabSelected(tab: ContactTab) {
         _uiState.update { it.copy(selectedTab = tab) }
     }
 
-    fun syncCallLogs(context: Context) {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isSyncingCallLogs = true) }
-            runCatching { callLogRepository.syncFromSystemCallLog(context) }
-                .onFailure { _effects.emit(ContactEffect.ShowToast("Không thể đồng bộ lịch sử cuộc gọi")) }
-            _uiState.update { it.copy(isSyncingCallLogs = false) }
-        }
-    }
+//    Xóa syncCallLogs(context) khỏi ViewModel
+//
+//    Sau khi bạn đã sync trong MyApp.onCreate(),
+//    thì trong ViewModel không được phép làm:
+//    fun syncCallLogs(context: Context) {
+//        viewModelScope.launch {
+//            _uiState.update { it.copy(isSyncingCallLogs = true) }
+//            runCatching { callLogRepository.syncFromSystemCallLog(context) }
+//                .onFailure { _effects.emit(ContactEffect.ShowToast("Không thể đồng bộ lịch sử cuộc gọi")) }
+//            _uiState.update { it.copy(isSyncingCallLogs = false) }
+//        }
+//    }
 
     fun requestCall(phoneNumber: String, contactName: String?) {
         if (_uiState.value.isCheckingScam) return
+
         viewModelScope.launch {
             _uiState.update { it.copy(isCheckingScam = true, scamAlert = null) }
+
             val response = scamCheckRepository.checkPhoneNumber(phoneNumber)
+
+            // Không nhận được thông tin (exception, network lỗi)
             if (response == null) {
                 _effects.emit(ContactEffect.ShowToast("Không thể kiểm tra số điện thoại"))
                 _effects.emit(ContactEffect.StartCall(phoneNumber))
@@ -91,15 +110,32 @@ class ContactScreenViewModel(
                 return@launch
             }
 
-            if (response.reported) {
+            // Backend báo lỗi (code != 200)
+            if (response.code != 200) {
+                _effects.emit(ContactEffect.ShowToast(response.message ?: "Có lỗi xảy ra"))
+                _effects.emit(ContactEffect.StartCall(phoneNumber))
+                _uiState.update { it.copy(isCheckingScam = false) }
+                return@launch
+            }
+
+            val info = response.data
+            if (info == null) {
+                _effects.emit(ContactEffect.StartCall(phoneNumber))
+                _uiState.update { it.copy(isCheckingScam = false) }
+                return@launch
+            }
+
+            // Nếu có tố cáo
+            if (info.reported) {
                 val alert = ScamAlert(
-                    phoneNumber = response.phone,
+                    phoneNumber = info.phone,
                     contactName = contactName,
-                    count = response.count,
-                    status = response.status,
-                    lastReport = response.lastReport
+                    count = info.count,
+                    status = info.status,
+                    lastReport = info.lastReport
                 )
                 pendingScamAlert = alert
+
                 _uiState.update {
                     it.copy(
                         isCheckingScam = false,
@@ -107,11 +143,13 @@ class ContactScreenViewModel(
                     )
                 }
             } else {
+                // Không bị báo cáo
                 _uiState.update { it.copy(isCheckingScam = false) }
                 _effects.emit(ContactEffect.StartCall(phoneNumber))
             }
         }
     }
+
 
     fun dismissScamAlert() {
         pendingScamAlert = null
@@ -133,16 +171,25 @@ class ContactScreenViewModel(
     ): ContactUiState {
         val filteredContacts = filterContacts(contacts, searchQuery)
         val filteredLogs = filterLogs(groupedLogs, searchQuery)
+
+        val (today, yesterday, older) = filteredLogs.groupByDate()
+
         return copy(
             contacts = contacts,
             groupedCallLogs = groupedLogs,
             filteredContacts = filteredContacts,
-            filteredCallLogs = filteredLogs
+            filteredCallLogs = filteredLogs,
+
+            todayCallLogs = today,
+            yesterdayCallLogs = yesterday,
+            olderCallLogs = older
         )
     }
 
+
     private fun ContactUiState.applyFilters(): ContactUiState =
         updateFilters(contacts, groupedCallLogs)
+
 
     companion object {
         private fun filterContacts(contacts: List<Contact>, query: String): List<Contact> {
@@ -177,19 +224,8 @@ class ContactScreenViewModelFactory(
     }
 }
 
-data class ContactUiState(
-    val contacts: List<Contact> = emptyList(),
-    val groupedCallLogs: List<GroupedCallLog> = emptyList(),
-    val filteredContacts: List<Contact> = emptyList(),
-    val filteredCallLogs: List<GroupedCallLog> = emptyList(),
-    val searchQuery: String = "",
-    val selectedTab: ContactTab = ContactTab.CallHistory,
-    val isCheckingScam: Boolean = false,
-    val isSyncingCallLogs: Boolean = false,
-    val scamAlert: ScamAlert? = null
-)
 
-enum class ContactTab { CallHistory, Contacts }
+
 
 data class ScamAlert(
     val phoneNumber: String,
@@ -203,11 +239,6 @@ sealed interface ContactEffect {
     data class StartCall(val phoneNumber: String) : ContactEffect
     data class ShowToast(val message: String) : ContactEffect
 }
-
-data class PendingCall(
-    val phoneNumber: String,
-    val contactName: String?
-)
 
 private fun List<GroupedCallLog>.filter(query: String, selector: (GroupedCallLog) -> String): List<GroupedCallLog> {
     if (query.isBlank()) return this
@@ -232,3 +263,32 @@ private fun List<CallLog>.toGrouped(): List<GroupedCallLog> =
         }
         .sortedByDescending { it.lastCallTimestamp }
 
+
+private fun List<GroupedCallLog>.groupByDate(): Triple<List<GroupedCallLog>, List<GroupedCallLog>, List<GroupedCallLog>> {
+    val calendar = Calendar.getInstance()
+
+    // Bắt đầu ngày hôm nay 00:00:00
+    calendar.set(Calendar.HOUR_OF_DAY, 0)
+    calendar.set(Calendar.MINUTE, 0)
+    calendar.set(Calendar.SECOND, 0)
+    calendar.set(Calendar.MILLISECOND, 0)
+    val startOfToday = calendar.timeInMillis
+
+    // Bắt đầu ngày hôm qua 00:00:00
+    calendar.add(Calendar.DAY_OF_YEAR, -1)
+    val startOfYesterday = calendar.timeInMillis
+
+    val todayList = mutableListOf<GroupedCallLog>()
+    val yesterdayList = mutableListOf<GroupedCallLog>()
+    val olderList = mutableListOf<GroupedCallLog>()
+
+    for (call in this) {
+        when {
+            call.lastCallTimestamp >= startOfToday -> todayList.add(call)
+            call.lastCallTimestamp >= startOfYesterday -> yesterdayList.add(call)
+            else -> olderList.add(call)
+        }
+    }
+
+    return Triple(todayList, yesterdayList, olderList)
+}

@@ -85,6 +85,7 @@ class MessageRepository(context: Context) {
                             )
                         )
                     } while (it.moveToNext())
+                    //Đọc toàn bộ tin nhắn rồi di chuyển đến số kế tiếp
                 }
             }
 

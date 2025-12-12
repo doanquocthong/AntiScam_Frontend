@@ -38,7 +38,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.antiscam.data.repository.MessageRepository
-import com.example.antiscam.screens.contact.ContactTab
 import com.example.antiscam.screens.contact.FilterChip
 import com.example.antiscam.screens.message.MessageViewModel
 import kotlin.collections.component1

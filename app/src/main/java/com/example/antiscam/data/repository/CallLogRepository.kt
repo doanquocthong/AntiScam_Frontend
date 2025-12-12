@@ -11,6 +11,7 @@ import com.example.antiscam.data.model.CallLog
 import kotlinx.coroutines.flow.Flow
 import kotlin.math.absoluteValue
 
+//CẦN LÀM: 1. Chỉ đọc callLog 1 lần duy nhất khi tải app, khi có cuộc gọi đến thì lưu vào database
 class CallLogRepository(context: Context) {
     
     // Khởi tạo database ngay lập tức để đảm bảo sẵn sàng
@@ -71,8 +72,8 @@ class CallLogRepository(context: Context) {
         }
 
         try {
-            // Xóa hết lịch sử cũ trước khi đồng bộ
-            callLogDao.deleteAllCallLogs()
+//            // Xóa hết lịch sử cũ trước khi đồng bộ
+//            callLogDao.deleteAllCallLogs()
 
             val resolver = context.contentResolver
             val cursor = resolver.query(
@@ -147,6 +148,5 @@ class CallLogRepository(context: Context) {
             android.util.Log.e("CallLogRepository", "Error syncing from system call log", e)
         }
     }
-
 }
 

@@ -1,4 +1,4 @@
-package com.example.antiscam.screens.call
+package com.example.antiscam.screens.call_receive
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable

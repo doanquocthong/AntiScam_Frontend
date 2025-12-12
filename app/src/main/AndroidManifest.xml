@@ -30,8 +30,13 @@
     <uses-permission android:name="android.permission.ANSWER_PHONE_CALLS"/>
     <!-- Permission to manage own calls -->
     <uses-permission android:name="android.permission.MANAGE_OWN_CALLS"/>
-    <uses-permission android:name="android.permission.INTERNET"/>
+
+    <uses-permission android:name="android.permission.READ_PHONE_NUMBERS"/>
+    <uses-permission android:name="android.permission.BIND_CALL_REDIRECTION_SERVICE" tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.BIND_INCALL_SERVICE" tools:ignore="ProtectedPermissions" />
+
     <application
+        android:name=".MyApp"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -40,11 +45,11 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.AntiScam">
-
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:label="AntiCamApp"
+            android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.AntiScam">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -52,6 +57,14 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <service
+            android:name=".services.MyInCallService"
+            android:permission="android.permission.BIND_INCALL_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.telecom.InCallService" />
+            </intent-filter>
+        </service>
         <!-- Intent filter để ứng dụng có thể trở thành ứng dụng gọi mặc định -->
         <activity-alias
             android:name=".DialerActivity"
