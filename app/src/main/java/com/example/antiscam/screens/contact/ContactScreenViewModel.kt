@@ -1,12 +1,14 @@
 package com.example.antiscam.screens.contact
 
 import android.content.Context
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.antiscam.data.model.Contact
 import com.example.antiscam.data.model.CallLog
 import com.example.antiscam.data.model.GroupedCallLog
+import com.example.antiscam.data.model.ScamAlert
 import com.example.antiscam.data.model.enums.ContactTab
 import com.example.antiscam.data.repository.CallLogRepository
 import com.example.antiscam.data.repository.ContactRepository
@@ -74,6 +76,22 @@ class ContactScreenViewModel(
             try {
                 callLogRepository.insertCallLog(callLog)
             } catch (_: Exception) {}
+        }
+    }
+
+    fun deleteCallLog(id: Int) {
+        Log.d("CallLogViewModel", "deleteCallLog() called with id=$id")
+
+        viewModelScope.launch {
+            try {
+                Log.d("CallLogViewModel", "Deleting call log id=$id on thread=${Thread.currentThread().name}")
+
+                callLogRepository.deleteCallLog(id)
+
+                Log.i("CallLogViewModel", "Delete call log SUCCESS id=$id")
+            } catch (e: Exception) {
+                Log.e("CallLogViewModel", "Delete call log FAILED id=$id", e)
+            }
         }
     }
 
@@ -225,16 +243,6 @@ class ContactScreenViewModelFactory(
 }
 
 
-
-
-data class ScamAlert(
-    val phoneNumber: String,
-    val contactName: String?,
-    val count: Long,
-    val status: String,
-    val lastReport: String?
-)
-
 sealed interface ContactEffect {
     data class StartCall(val phoneNumber: String) : ContactEffect
     data class ShowToast(val message: String) : ContactEffect
@@ -245,23 +253,47 @@ private fun List<GroupedCallLog>.filter(query: String, selector: (GroupedCallLog
     return filter { selector(it).contains(query, ignoreCase = true) }
 }
 
-private fun List<CallLog>.toGrouped(): List<GroupedCallLog> =
-    groupBy { it.phoneNumber }
-        .map { (phone, logs) ->
-            val sorted = logs.sortedByDescending { it.timestamp }
-            val last = sorted.first()
-            GroupedCallLog(
-                phoneNumber = phone,
-                contactName = last.contactName,
-                callCount = logs.size,
-                lastCallTimestamp = last.timestamp,
-                lastCallType = last.callType,
-                avatarColor = last.avatarColor,
-                isScam = logs.any { it.isScam },
-                totalDuration = logs.sumOf { it.duration }
-            )
+private fun List<CallLog>.toGrouped(): List<GroupedCallLog> {
+    if (isEmpty()) return emptyList()
+
+    val sorted = this.sortedByDescending { it.timestamp }
+    val groups = mutableListOf<List<CallLog>>()
+    var currentGroup = mutableListOf<CallLog>()
+
+    var lastNumber: String? = null
+    //last number = null -> group -> lưu lại lastNumber-> duyệt số tiếp theo -> nếu không phải số trước đó (lastNumber) -> mở nhớm mới <->
+    for (log in sorted) {
+        if (log.phoneNumber == lastNumber || lastNumber == null) {
+            // cùng số → tiếp tục nhóm
+            currentGroup.add(log)
+        } else {
+            // số khác → đóng nhóm cũ, mở nhóm mới
+            groups.add(currentGroup)
+            currentGroup = mutableListOf(log)
         }
-        .sortedByDescending { it.lastCallTimestamp }
+        lastNumber = log.phoneNumber
+    }
+
+    // thêm nhóm cuối
+    groups.add(currentGroup)
+
+    // Mapping về GroupedCallLog
+    return groups.map { logs ->
+        val latest = logs.maxByOrNull { it.timestamp }!!
+        GroupedCallLog(
+            id = latest.id,
+            phoneNumber = latest.phoneNumber,
+            contactName = latest.contactName,
+            callCount = logs.size,
+            lastCallTimestamp = latest.timestamp,
+            lastCallType = latest.callType,
+            avatarColor = latest.avatarColor,
+            isScam = logs.any { it.isScam },
+            totalDuration = logs.sumOf { it.duration }
+        )
+    }
+}
+
 
 
 private fun List<GroupedCallLog>.groupByDate(): Triple<List<GroupedCallLog>, List<GroupedCallLog>, List<GroupedCallLog>> {

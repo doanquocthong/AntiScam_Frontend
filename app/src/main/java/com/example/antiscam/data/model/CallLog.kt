@@ -1,12 +1,18 @@
 package com.example.antiscam.data.model
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 /**
  * Đại diện cho một cuộc gọi trong hệ thống.
  * Có thể lấy từ nhật ký cuộc gọi (CallLog.Calls)
  */
-@Entity(tableName = "call_logs")
+@Entity(
+    tableName = "call_logs",
+    indices = [
+        Index(value = ["phoneNumber", "timestamp"], unique = true)
+    ]
+)
 data class CallLog (
     @PrimaryKey(autoGenerate = true)
     val id: Int = 0,

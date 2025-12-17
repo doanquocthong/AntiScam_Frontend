@@ -40,7 +40,7 @@ import com.example.antiscam.data.repository.ScamCheckRepository
 @Composable
 fun CallScreen(
     callerName: String? = "Không xác định",
-    phoneNumber: String = "0000 000 000",
+    phoneNumber: String = "0945946668",
     onAnswer: () -> Unit = {},
     onReject: () -> Unit = {}
 ) {

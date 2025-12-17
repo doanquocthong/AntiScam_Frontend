@@ -148,5 +148,58 @@ class CallLogRepository(context: Context) {
             android.util.Log.e("CallLogRepository", "Error syncing from system call log", e)
         }
     }
+
+
+    suspend fun insertFromSystem(
+        phoneNumber: String,
+        callType: Int,
+        timestamp: Long,
+        duration: Long
+    ) {
+        val callTypeStr = when (callType) {
+            SystemCallLog.Calls.OUTGOING_TYPE -> "OUTGOING"
+            SystemCallLog.Calls.INCOMING_TYPE -> "INCOMING"
+            SystemCallLog.Calls.MISSED_TYPE -> "MISSED"
+            else -> "OUTGOING"
+        }
+
+        val colors = listOf(
+            0xFF3D3B8E,
+            0xFF2C5F2D,
+            0xFF7B3F00,
+            0xFF5A189A,
+            0xFF1E6091,
+            0xFF9A031E,
+            0xFF364F6B
+        )
+
+        val avatarColor = colors[
+            phoneNumber.hashCode().absoluteValue % colors.size
+        ].toInt()
+
+        val callLog = CallLog(
+            phoneNumber = phoneNumber,
+            contactName = null,          // system chưa resolve
+            callType = callTypeStr,
+            timestamp = timestamp,
+            duration = duration.toInt(),
+            isScam = false,
+            avatarColor = avatarColor
+        )
+
+        try {
+            callLogDao.insertCallLog(callLog)
+            android.util.Log.d(
+                "CallLogRepository",
+                "Inserted new system call: $phoneNumber - $callTypeStr"
+            )
+        } catch (e: Exception) {
+            android.util.Log.e(
+                "CallLogRepository",
+                "Duplicate or error inserting system call",
+                e
+            )
+        }
+    }
 }
 

@@ -4,6 +4,7 @@ package com.example.antiscam.data.model
  * CallLog đã được group theo phoneNumber, hiển thị số lần gọi
  */
 data class GroupedCallLog(
+    val id: Int,
     val phoneNumber: String,
     val contactName: String?,
     val callCount: Int,                    // Số lần gọi

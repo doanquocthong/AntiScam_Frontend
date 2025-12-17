@@ -2,6 +2,7 @@ package com.example.antiscam.screens.contact
 
 import com.example.antiscam.data.model.Contact
 import com.example.antiscam.data.model.GroupedCallLog
+import com.example.antiscam.data.model.ScamAlert
 import com.example.antiscam.data.model.enums.ContactTab
 
 data class ContactUiState(

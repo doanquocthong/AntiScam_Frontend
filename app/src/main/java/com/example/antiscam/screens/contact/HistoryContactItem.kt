@@ -1,8 +1,13 @@
 package com.example.antiscam.screens.contact
 
 import ReportDialog
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -10,6 +15,9 @@ import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CallMade
 import androidx.compose.material.icons.filled.CallMissed
 import androidx.compose.material.icons.filled.CallReceived
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Message
 import androidx.compose.material.icons.filled.Report
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -22,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -31,7 +40,11 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 @Composable
-fun HistoryContactItem(groupedCallLog: GroupedCallLog, onCallClick: (GroupedCallLog) -> Unit = {}, onReportClick: (ReportRequest) -> Unit = {}) {
+fun HistoryContactItem(groupedCallLog: GroupedCallLog,
+                       onCallClick: (GroupedCallLog) -> Unit = {},
+                       onReportClick: (ReportRequest) -> Unit = {},
+                       onDelete: (GroupedCallLog) -> Unit // 👈 THÊM
+) {
     // Sử dụng màu đã lưu trong groupedCallLog
     val avatarColor = remember(groupedCallLog.avatarColor) {
         if (groupedCallLog.avatarColor != 0) {
@@ -61,145 +74,234 @@ fun HistoryContactItem(groupedCallLog: GroupedCallLog, onCallClick: (GroupedCall
         "MISSED" -> "Nhỡ"
         else -> "Không xác định"
     }
-    
+    var expanded by remember { mutableStateOf(false) }
+    var isSelected by remember { mutableStateOf(false) }
+    var isDeleteMode by remember { mutableStateOf(false) }
+
+    val offsetX by animateDpAsState(
+        targetValue = if (isDeleteMode) (-72).dp else 0.dp,
+        animationSpec = tween(
+            durationMillis = 220,
+            easing = FastOutSlowInEasing
+        ),
+        label = "slide_delete"
+    )
     val timeText = formatTimestamp(groupedCallLog.lastCallTimestamp)
     val durationText = if (groupedCallLog.totalDuration > 0) formatDuration(groupedCallLog.totalDuration) else ""
-    val nameOrPhone = groupedCallLog.contactName ?: groupedCallLog.phoneNumber
-    val firstChar = nameOrPhone.trim().firstOrNull()?.uppercase() ?: "?"
+    val displayName = groupedCallLog.contactName
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() }
+        ?: groupedCallLog.phoneNumber
+
+    val firstChar = displayName.trim().firstOrNull()?.uppercase() ?: "?"
     var showReportDialog by remember { mutableStateOf(false) }
+
     // A ?: B (If A null, result: B, and vice versa)
-    Row(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-            .clip(MaterialTheme.shapes.medium)
-            .background(Color(0xFF1C1C1E))
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = 16.dp, vertical = 6.dp)
     ) {
-        // Avatar
-        Box(
-            modifier = Modifier
-                .size(45.dp)
-                .clip(CircleShape)
-                .background(avatarColor),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = firstChar,
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp
-            )
-        }
 
-        Spacer(modifier = Modifier.width(12.dp))
-
-        Column(modifier = Modifier.weight(1f)) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    text = groupedCallLog.contactName ?: groupedCallLog.phoneNumber,
-                    color = Color.White,
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Medium
-                )
-                // Hiển thị số lần gọi nếu > 1
-                if (groupedCallLog.callCount > 1) {
-                    Surface(
-                        color = Color(0xFF38383A),
-                        shape = MaterialTheme.shapes.small
-                    ) {
-                        Text(
-                            text = "(${groupedCallLog.callCount})",
-                            color = Color(0xFFAAAAAA),
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
-            }
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+        // 🔴 Background delete
+        if (isDeleteMode) {
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .clip(MaterialTheme.shapes.medium)
+                    .background(Color(0xFFE53935)),
+                contentAlignment = Alignment.CenterEnd
             ) {
                 Icon(
-                    imageVector = callIcon,
-                    contentDescription = null,
-                    tint = callIconColor,
-                    modifier = Modifier.size(14.dp)
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Xóa",
+                    tint = Color.White,
+                    modifier = Modifier
+                        .padding(end = 24.dp)
+                        .size(26.dp)
+                        .clickable {
+                            onDelete(groupedCallLog)   // ✅ PHÁT SỰ KIỆN
+                            isDeleteMode = false
+                        }
                 )
-                Text(
-                    text = callTypeText,
-                    color = Color(0xFFAAAAAA),
-                    fontSize = 13.sp
-                )
-                if (durationText.isNotEmpty()) {
+            }
+        }
+        Column(
+            modifier = Modifier
+                .offset(x = offsetX)
+                .clip(MaterialTheme.shapes.medium)
+                .background(Color(0xFF1C1C1E))
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onTap = {
+                            if (isDeleteMode) {
+                                isDeleteMode = false
+                            } else {
+                                expanded = !expanded
+                            }
+                        },
+                        onLongPress = {
+                            isDeleteMode = true
+                        }
+                    )
+                }
+                .padding(16.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Avatar
+                Box(
+                    modifier = Modifier
+                        .size(45.dp)
+                        .clip(CircleShape)
+                        .background(avatarColor),
+                    contentAlignment = Alignment.Center
+                ) {
                     Text(
-                        text = " • $durationText",
+                        text = firstChar,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = displayName,
+                            color = Color.White,
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        // Hiển thị số lần gọi nếu > 1
+                        if (groupedCallLog.callCount > 1) {
+                            Surface(
+                                color = Color(0xFF38383A),
+                                shape = MaterialTheme.shapes.small
+                            ) {
+                                Text(
+                                    text = "(${groupedCallLog.callCount})",
+                                    color = Color(0xFFAAAAAA),
+                                    fontSize = 12.sp,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+                    }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = callIcon,
+                            contentDescription = null,
+                            tint = callIconColor,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Text(
+                            text = callTypeText,
+                            color = Color(0xFFAAAAAA),
+                            fontSize = 13.sp
+                        )
+                        if (durationText.isNotEmpty()) {
+                            Text(
+                                text = " • $durationText",
+                                color = Color(0xFFAAAAAA),
+                                fontSize = 13.sp
+                            )
+                        }
+                    }
+                    Text(
+                        text = timeText,
                         color = Color(0xFFAAAAAA),
                         fontSize = 13.sp
                     )
                 }
-            }
-            Text(
-                text = timeText,
-                color = Color(0xFFAAAAAA),
-                fontSize = 13.sp
-            )
-        }
 
-        Column(
-            horizontalAlignment = Alignment.End,
-            modifier = Modifier.padding(start = 8.dp)
-        ) {
-
-            if (groupedCallLog.isScam) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Surface(
-                    color = Color(0xFFE74C3C).copy(alpha = 0.2f),
-                    shape = MaterialTheme.shapes.small
+                Column(
+                    horizontalAlignment = Alignment.End,
+                    modifier = Modifier.padding(start = 8.dp)
                 ) {
-                    Text(
-                        text = "Lừa đảo",
-                        color = Color(0xFFE74C3C),
-                        fontSize = 10.sp,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                        fontWeight = FontWeight.Bold
+
+                    if (groupedCallLog.isScam) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Surface(
+                            color = Color(0xFFE74C3C).copy(alpha = 0.2f),
+                            shape = MaterialTheme.shapes.small
+                        ) {
+                            Text(
+                                text = "Lừa đảo",
+                                color = Color(0xFFE74C3C),
+                                fontSize = 10.sp,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+                if (isSelected) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Xóa",
+                        tint = Color.Red,
+                        modifier = Modifier
+                            .size(26.dp)
+                            .clickable {
+                                // TODO: gọi callback xóa
+                                isSelected = false
+                            }
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Call,
+                        contentDescription = "Gọi điện",
+                        tint = Color.White,
+                        modifier = Modifier
+                            .size(26.dp)
+                            .clickable { onCallClick(groupedCallLog) }
+                    )
+
+                    Spacer(modifier = Modifier.width(10.dp))
+
+                    Icon(
+                        imageVector = Icons.Default.Report,
+                        contentDescription = "Báo cáo",
+                        tint = Color(0xFFA6382D),
+                        modifier = Modifier
+                            .size(26.dp)
+                            .clickable { showReportDialog = true }
+                    )
+                }
+
+                if (showReportDialog) {
+                    ReportDialog(
+                        phoneNumber = groupedCallLog.phoneNumber,
+                        onDismiss = { showReportDialog = false },
+                        onSubmit = { reportRequest ->
+                            onReportClick(reportRequest)
+                        }
                     )
                 }
             }
-        }
-        Icon(
-            imageVector = Icons.Default.Call,
-            contentDescription = "Gọi điện",
-            tint = Color.White,
-            modifier = Modifier
-                .size(26.dp)
-                .clickable { onCallClick(groupedCallLog) }
-        )
-        Spacer(modifier = Modifier.width(10.dp))
-        Icon(
-            imageVector = Icons.Default.Report,
-            contentDescription = "Báo cáo",
-            tint = Color(0xFFA6382D),
-            modifier = Modifier
-                .size(26.dp)
-                .clickable {
-                    showReportDialog = true
+            AnimatedVisibility(visible = expanded) {
+                Column(
+                    modifier = Modifier
+                        .padding(top = 14.dp)
+                        .background(Color(0xFF2C2C2E), shape = MaterialTheme.shapes.medium)
+                        .clip(MaterialTheme.shapes.medium)
+                ) {
+                    ActionItem(Icons.Default.Message, "Tin nhắn")
+                    Divider(color = Color.Black.copy(alpha = 0.3f))
+                    ActionItem(Icons.Default.History, "Nhật ký")
                 }
-        )
-        if (showReportDialog) {
-            ReportDialog(
-                phoneNumber = groupedCallLog.phoneNumber,
-                onDismiss = { showReportDialog = false },
-                onSubmit = { reportRequest ->
-                    onReportClick(reportRequest)
-                }
-            )
+            }
         }
     }
 }
