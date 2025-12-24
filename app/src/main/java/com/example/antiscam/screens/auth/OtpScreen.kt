@@ -1,6 +1,7 @@
 package com.example.antiscam.screens.auth
 
 import android.util.Log
+import androidx.activity.ComponentActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -15,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -30,12 +32,14 @@ private const val TAG = "OtpScreen"
 fun OtpScreen(
     navController: NavController,
     onLoginSuccess: () -> Unit,
-    viewModel: AuthViewModel = viewModel()
+    authViewModel: AuthViewModel =
+        viewModel(LocalContext.current as ComponentActivity)
+
 ) {
     var otp by remember { mutableStateOf("") }
 
-    val loading = viewModel.loading
-    val errorMessage = viewModel.errorMessage
+    val loading = authViewModel.loading
+    val errorMessage = authViewModel.errorMessage
 
     // 🔍 Theo dõi state
     LaunchedEffect(loading) {
@@ -155,7 +159,7 @@ fun OtpScreen(
                         return@Button
                     }
 
-                    viewModel.verifyOtp(
+                    authViewModel.verifyOtp(
                         otp = otp,
                         onLoginSuccess = {
                             Log.d(TAG, "OTP verified successfully → Login success")

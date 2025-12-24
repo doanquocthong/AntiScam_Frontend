@@ -33,7 +33,11 @@ class MessageRepository(context: Context) {
      * Đồng bộ tin nhắn từ hệ thống vào database Room
      */
     suspend fun syncFromSystemMessages(context: Context) {
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) {
+        if (ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.READ_SMS
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
             Log.e("MessageRepository", "READ_SMS permission not granted!")
             return
         }
@@ -51,48 +55,60 @@ class MessageRepository(context: Context) {
                     Telephony.Sms.ADDRESS,
                     Telephony.Sms.BODY,
                     Telephony.Sms.DATE,
-                    Telephony.Sms.TYPE
+                    Telephony.Sms.TYPE,
+                    Telephony.Sms.READ
                 ),
                 null,
                 null,
                 "${Telephony.Sms.DATE} DESC"
             )
 
-            cursor?.use {
-                val addressIdx = it.getColumnIndexOrThrow(Telephony.Sms.ADDRESS)
-                val bodyIdx = it.getColumnIndexOrThrow(Telephony.Sms.BODY)
-                val dateIdx = it.getColumnIndexOrThrow(Telephony.Sms.DATE)
-                val typeIdx = it.getColumnIndexOrThrow(Telephony.Sms.TYPE)
+            cursor?.use { c ->
 
-                if (it.moveToFirst()) {
-                    do {
-                        val address = it.getString(addressIdx) ?: ""
-                        val body = it.getString(bodyIdx) ?: ""
-                        val date = it.getLong(dateIdx)
-                        val type = it.getInt(typeIdx)
-
-                        Log.d("SMS", "address=$address | body=$body")
-
-                        messagesToInsert.add(
-                            Message(
-                                address = address,
-                                contactName = null,
-                                body = body,
-                                date = date,
-                                type = type,
-                                isScam = false,
-                                isSentByUser = (type == 2)
-                            )
-                        )
-                    } while (it.moveToNext())
-                    //Đọc toàn bộ tin nhắn rồi di chuyển đến số kế tiếp
+                if (!c.moveToFirst()) {
+                    Log.w("MessageRepository", "SMS cursor empty")
+                    return
                 }
+
+                val addressIdx = c.getColumnIndexOrThrow(Telephony.Sms.ADDRESS)
+                val bodyIdx = c.getColumnIndexOrThrow(Telephony.Sms.BODY)
+                val dateIdx = c.getColumnIndexOrThrow(Telephony.Sms.DATE)
+                val typeIdx = c.getColumnIndexOrThrow(Telephony.Sms.TYPE)
+                val readIdx = c.getColumnIndexOrThrow(Telephony.Sms.READ)
+
+                do {
+                    val address = c.getString(addressIdx) ?: ""
+                    val body = c.getString(bodyIdx) ?: ""
+                    val date = c.getLong(dateIdx)
+                    val type = c.getInt(typeIdx)
+                    val isRead = c.getInt(readIdx) == 1
+
+                    Log.d(
+                        "SMS",
+                        "address=$address | type=$type | read=$isRead | body=$body"
+                    )
+
+                    messagesToInsert.add(
+                        Message(
+                            address = address,
+                            contactName = null,
+                            body = body,
+                            date = date,
+                            type = type,
+                            isScam = false,
+                            isSentByUser = (type == Telephony.Sms.MESSAGE_TYPE_SENT),
+                            isRead = isRead
+                        )
+                    )
+
+                } while (c.moveToNext())
             }
 
-
             if (messagesToInsert.isNotEmpty()) {
-                Log.d("MessageRepository", "Inserting ${messagesToInsert.size} messages into DB")
-                messageDao.deleteAllMessages()
+                Log.d(
+                    "MessageRepository",
+                    "Inserting ${messagesToInsert.size} messages into DB"
+                )
                 messageDao.insertMessages(messagesToInsert)
             } else {
                 Log.d("MessageRepository", "No messages found")
@@ -101,5 +117,13 @@ class MessageRepository(context: Context) {
         } catch (e: Exception) {
             Log.e("MessageRepository", "Error syncing SMS messages", e)
         }
+    }
+
+    fun getMessagesByAddress(address: String): Flow<List<Message>> {
+        return messageDao.getMessagesByAddress(address)
+    }
+
+    suspend fun markMessageAsRead(address: String) {
+        messageDao.markMessageAsRead(address)
     }
 }

@@ -42,7 +42,7 @@ class ContactScreenViewModel(
         loadContacts()
     }
 
-
+    //Lấy tất cả số danh bạ
     fun loadContacts() {
         viewModelScope.launch {
             val contacts = contactRepository.getAllContacts()
@@ -54,6 +54,7 @@ class ContactScreenViewModel(
         }
     }
 
+    //Lấy tất cả nhật ký cuộc gọi trong room
     private fun observeCallLogs() {
         viewModelScope.launch {
             callLogRepository.getAllCallLogs().collect { logs ->
@@ -288,13 +289,11 @@ private fun List<CallLog>.toGrouped(): List<GroupedCallLog> {
             lastCallTimestamp = latest.timestamp,
             lastCallType = latest.callType,
             avatarColor = latest.avatarColor,
-            isScam = logs.any { it.isScam },
+            isScam = latest.isScam,
             totalDuration = logs.sumOf { it.duration }
         )
     }
 }
-
-
 
 private fun List<GroupedCallLog>.groupByDate(): Triple<List<GroupedCallLog>, List<GroupedCallLog>, List<GroupedCallLog>> {
     val calendar = Calendar.getInstance()

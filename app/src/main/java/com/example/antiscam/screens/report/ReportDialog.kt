@@ -1,10 +1,16 @@
-import androidx.compose.foundation.background
+package com.example.antiscam.screens.contact
+
+import android.util.Log
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
@@ -12,10 +18,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.antiscam.data.model.request.ReportRequest
+import com.example.antiscam.screens.report.ReportUiState
 
 @Composable
 fun ReportDialog(
     phoneNumber: String,
+    reporterPhone: String?,
+    uiState: ReportUiState,
     onDismiss: () -> Unit,
     onSubmit: (ReportRequest) -> Unit
 ) {
@@ -26,53 +35,93 @@ fun ReportDialog(
     var description by remember { mutableStateOf("") }
     var evidenceLink by remember { mutableStateOf("") }
 
+    var phoneError by remember { mutableStateOf(false) }
+    var scamTypeError by remember { mutableStateOf(false) }
     val textFieldColors = TextFieldDefaults.colors(
         focusedTextColor = Color.White,
         unfocusedTextColor = Color.White,
-        disabledTextColor = Color.Gray,
-        errorTextColor = Color.Red,
         focusedContainerColor = Color(0xFF2C2C2E),
         unfocusedContainerColor = Color(0xFF2C2C2E),
-        disabledContainerColor = Color.DarkGray,
-        errorContainerColor = Color.Red.copy(alpha = 0.1f),
+        errorContainerColor = Color(0xFFB71C1C).copy(alpha = 0.15f),
         cursorColor = Color.White,
-        errorCursorColor = Color.Red,
+        errorCursorColor = Color(0xFFB71C1C),
         focusedIndicatorColor = Color.Transparent,
         unfocusedIndicatorColor = Color.Transparent,
-        disabledIndicatorColor = Color.Gray,
-        errorIndicatorColor = Color.Red,
+        errorIndicatorColor = Color(0xFFB71C1C),
         focusedLabelColor = Color.White,
         unfocusedLabelColor = Color.Gray,
-        disabledLabelColor = Color.DarkGray,
-        errorLabelColor = Color.Red,
-        focusedPlaceholderColor = Color.Gray,
-        unfocusedPlaceholderColor = Color.Gray,
-        disabledPlaceholderColor = Color.DarkGray,
-        errorPlaceholderColor = Color.Red
+        errorLabelColor = Color(0xFFB71C1C)
     )
+    val ownerPhone = reporterPhone ?: ""
+    fun displayVietnamPhone(phone: String): String {
+        val p = phone.trim().replace(" ", "")
+
+        return when {
+            p.startsWith("+84") && p.length >= 11 ->
+                "0" + p.drop(3)
+
+            else -> p
+        }
+    }
+
+    LaunchedEffect(uiState.isSuccess) {
+        if (uiState.isSuccess) {
+            onDismiss()
+        }
+    }
 
     Dialog(
-        onDismissRequest = { onDismiss() },
-        properties = DialogProperties(usePlatformDefaultWidth = false) // để dialog rộng theo content
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Surface(
             modifier = Modifier
                 .fillMaxWidth(0.9f)
-                .imePadding() // đẩy UI lên khi bàn phím hiện
-                .verticalScroll(rememberScrollState())
-                .background(Color(0xFF1C1C1E)),
+                .imePadding()
+                .border(
+                    width = 1.dp,
+                    color = Color(0xFFCBBCBC),
+                    shape = MaterialTheme.shapes.small)
+                .verticalScroll(rememberScrollState()),
             shape = MaterialTheme.shapes.medium,
             color = Color(0xFF1C1C1E)
         ) {
             Column(
                 modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+
+                // 🔴 CẢNH BÁO
+                Surface(
+                    color = Color(0xFFB71C1C).copy(alpha = 0.15f),
+                    shape = MaterialTheme.shapes.small
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Warning,
+                            contentDescription = null,
+                            tint = Color(0xFFB71C1C)
+                        )
+                        Text(
+                            text = "Chỉ báo cáo khi bạn chắc chắn đây là số điện thoại lừa đảo.",
+                            color = Color(0xFFB71C1C),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+
                 Text(
                     text = "Báo cáo số điện thoại",
                     style = MaterialTheme.typography.titleLarge,
                     color = Color.White
                 )
+
 
                 OutlinedTextField(
                     value = reporterName,
@@ -82,15 +131,41 @@ fun ReportDialog(
                     modifier = Modifier.fillMaxWidth(),
                     colors = textFieldColors
                 )
+
+                OutlinedTextField(
+                    value = displayVietnamPhone(ownerPhone),
+                    onValueChange = {},
+                    label = { Text("Số điện thoại người báo cáo") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    readOnly = true,
+                    enabled = false,
+                    colors = TextFieldDefaults.colors(
+                        disabledTextColor = Color.White,
+                        disabledContainerColor = Color(0xFF2C2C2E),
+                        disabledLabelColor = Color.Gray,
+                        disabledIndicatorColor = Color.Transparent
+                    )
+                )
                 OutlinedTextField(
                     value = phone,
-                    onValueChange = { phone = it },
-                    label = { Text("Số điện thoại") },
+                    onValueChange = {
+                        phone = it
+                        phoneError = false
+                    },
+                    label = { Text("Số điện thoại báo cáo*") },
                     singleLine = true,
+                    isError = phoneError,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                     modifier = Modifier.fillMaxWidth(),
-                    colors = textFieldColors
+                    colors = textFieldColors,
+                    supportingText = {
+                        if (phoneError) {
+                            Text("Số điện thoại không được để trống")
+                        }
+                    }
                 )
+
                 OutlinedTextField(
                     value = email,
                     onValueChange = { email = it },
@@ -100,28 +175,40 @@ fun ReportDialog(
                     modifier = Modifier.fillMaxWidth(),
                     colors = textFieldColors
                 )
+
                 OutlinedTextField(
                     value = scamType,
-                    onValueChange = { scamType = it },
-                    label = { Text("Loại lừa đảo") },
+                    onValueChange = {
+                        scamType = it
+                        scamTypeError = false
+                    },
+                    label = { Text("Loại lừa đảo *") },
                     singleLine = true,
+                    isError = scamTypeError,
                     modifier = Modifier.fillMaxWidth(),
-                    colors = textFieldColors
+                    colors = textFieldColors,
+                    supportingText = {
+                        if (scamTypeError) {
+                            Text("Vui lòng nhập loại lừa đảo")
+                        }
+                    }
                 )
+
                 OutlinedTextField(
                     value = description,
                     onValueChange = { description = it },
-                    label = { Text("Mô tả") },
+                    label = { Text("Mô tả chi tiết") },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(100.dp),
                     maxLines = 4,
                     colors = textFieldColors
                 )
+
                 OutlinedTextField(
                     value = evidenceLink,
                     onValueChange = { evidenceLink = it },
-                    label = { Text("Link bằng chứng") },
+                    label = { Text("Link bằng chứng (nếu có)") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     colors = textFieldColors
@@ -136,20 +223,45 @@ fun ReportDialog(
                     TextButton(onClick = onDismiss) {
                         Text("Huỷ", color = Color.White)
                     }
+
                     Spacer(modifier = Modifier.width(8.dp))
-                    TextButton(onClick = {
-                        onSubmit(
-                            ReportRequest(
-                                reporterName = reporterName,
-                                phone = phone,
-                                email = email,
-                                scamType = scamType,
-                                description = description,
-                                evidenceLink = evidenceLink
-                            )
+
+                    Button(
+                        onClick = {
+                            phoneError = phone.isBlank()
+                            scamTypeError = scamType.isBlank()
+                            Log.d("Reported check","Clicked historyContactItem to report by ReportDialog, Before report")
+
+                            if (!phoneError && !scamTypeError) {
+                                onSubmit(
+                                    ReportRequest(
+                                        reporterName = reporterName,
+                                        reporterPhone = ownerPhone,
+                                        phone = phone,
+                                        email = email,
+                                        scamType = scamType,
+                                        description = description,
+                                        evidenceLink = evidenceLink
+                                    )
+                                )
+                                Log.d("Report","Clicked historyContactItem to report by ReportDialog, After report")
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFFB71C1C),
+                            disabledContainerColor = Color.Gray
                         )
-                    }) {
-                        Text("Gửi", color = Color.White)
+
+                    ) {
+                        if (uiState.isLoading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = Color.White
+                            )
+                        } else {
+                            Text("Gửi báo cáo", color = Color.White)
+                        }
                     }
                 }
             }

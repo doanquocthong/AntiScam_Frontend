@@ -1,5 +1,6 @@
 package com.example.antiscam.screens.contact
 
+import android.R
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -41,6 +42,7 @@ import com.example.antiscam.data.model.Contact
 @Composable
 fun ContactItem(
     contact: Contact,
+    openCallLogDetail: (String) -> Unit,
     onCallRequested: (Contact) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -109,19 +111,20 @@ fun ContactItem(
                     .background(Color(0xFF2C2C2E), shape = MaterialTheme.shapes.medium)
                     .clip(MaterialTheme.shapes.medium)
             ) {
-                ActionItem(Icons.Default.Message, "Tin nhắn")
+                ActionItem(Icons.Default.Message, "Tin nhắn", {})
                 Divider(color = Color.Black.copy(alpha = 0.3f))
-                ActionItem(Icons.Default.History, "Nhật ký")
+                ActionItem(Icons.Default.History, "Nhật ký", { openCallLogDetail(contact.phoneNumber) })
             }
         }
     }
 }
 
 @Composable
-fun ActionItem(icon: ImageVector, text: String) {
+fun ActionItem(icon: ImageVector, text: String, onclick:() -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable{onclick()}
             .padding(horizontal = 18.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

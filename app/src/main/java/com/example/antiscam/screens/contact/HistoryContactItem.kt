@@ -1,6 +1,5 @@
 package com.example.antiscam.screens.contact
-
-import ReportDialog
+import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
@@ -19,8 +18,10 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Message
 import androidx.compose.material.icons.filled.Report
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,14 +37,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.antiscam.data.model.GroupedCallLog
 import com.example.antiscam.data.model.request.ReportRequest
+import com.example.antiscam.screens.report.ReportUiState
 import java.text.SimpleDateFormat
 import java.util.*
 
 @Composable
-fun HistoryContactItem(groupedCallLog: GroupedCallLog,
-                       onCallClick: (GroupedCallLog) -> Unit = {},
-                       onReportClick: (ReportRequest) -> Unit = {},
-                       onDelete: (GroupedCallLog) -> Unit // 👈 THÊM
+fun HistoryContactItem(
+    groupedCallLog: GroupedCallLog,
+    reporterPhone: String?,
+    onCallClick: (GroupedCallLog) -> Unit = {},
+    reportUiState: ReportUiState,
+    openCallLogDetail:(String) -> Unit,
+    onReportClick: (ReportRequest) -> Unit = {},
+    onDelete: (GroupedCallLog) -> Unit // 👈 THÊM
 ) {
     // Sử dụng màu đã lưu trong groupedCallLog
     val avatarColor = remember(groupedCallLog.avatarColor) {
@@ -86,6 +92,8 @@ fun HistoryContactItem(groupedCallLog: GroupedCallLog,
         ),
         label = "slide_delete"
     )
+    val isScamText : String = "Số điện thoại nằm trong danh sách đáng ngờ"
+
     val timeText = formatTimestamp(groupedCallLog.lastCallTimestamp)
     val durationText = if (groupedCallLog.totalDuration > 0) formatDuration(groupedCallLog.totalDuration) else ""
     val displayName = groupedCallLog.contactName
@@ -93,8 +101,28 @@ fun HistoryContactItem(groupedCallLog: GroupedCallLog,
         ?.takeIf { it.isNotEmpty() }
         ?: groupedCallLog.phoneNumber
 
-    val firstChar = displayName.trim().firstOrNull()?.uppercase() ?: "?"
+    val firstChar = displayName
+        .trim()
+        .firstOrNull()
+        ?.takeIf { it.isLetter() }
+        ?.uppercase()
+        ?: "?"
+
+    val reporterPhone = reporterPhone
+    Log.d("reporterPhone", "= $reporterPhone")
+
     var showReportDialog by remember { mutableStateOf(false) }
+    LaunchedEffect(
+        reportUiState.isSuccess,
+        reportUiState.errorMessage
+    ) {
+        if (
+            showReportDialog &&
+            (reportUiState.isSuccess || reportUiState.errorMessage != null)
+        ) {
+            showReportDialog = false
+        }
+    }
 
     // A ?: B (If A null, result: B, and vice versa)
     Box(
@@ -150,22 +178,41 @@ fun HistoryContactItem(groupedCallLog: GroupedCallLog,
             Row(
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                Log.d("Before if groupedCallLog.isScam", "= ${groupedCallLog.isScam}")
                 // Avatar
-                Box(
-                    modifier = Modifier
-                        .size(45.dp)
-                        .clip(CircleShape)
-                        .background(avatarColor),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = firstChar,
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp
-                    )
+                if(groupedCallLog.isScam) {
+                    Log.d("groupedCallLog.phone", "= ${groupedCallLog.phoneNumber}")
+                    Box(
+                        modifier = Modifier
+                            .size(45.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFB71C1C)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Warning,
+                            contentDescription = "Avatar cảnh báo",
+                            modifier = Modifier.size(16.dp),
+                            tint = Color.White
+                        )
+                    }
+                } else {
+                    Log.d("groupedCallLog.phone", "= ${groupedCallLog.phoneNumber}")
+                    Box(
+                        modifier = Modifier
+                            .size(45.dp)
+                            .clip(CircleShape)
+                            .background(avatarColor),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = firstChar,
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp
+                        )
+                    }
                 }
-
                 Spacer(modifier = Modifier.width(12.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
@@ -223,13 +270,6 @@ fun HistoryContactItem(groupedCallLog: GroupedCallLog,
                         color = Color(0xFFAAAAAA),
                         fontSize = 13.sp
                     )
-                }
-
-                Column(
-                    horizontalAlignment = Alignment.End,
-                    modifier = Modifier.padding(start = 8.dp)
-                ) {
-
                     if (groupedCallLog.isScam) {
                         Spacer(modifier = Modifier.height(4.dp))
                         Surface(
@@ -237,7 +277,7 @@ fun HistoryContactItem(groupedCallLog: GroupedCallLog,
                             shape = MaterialTheme.shapes.small
                         ) {
                             Text(
-                                text = "Lừa đảo",
+                                text = "Cẩn thận với số điện thoại này",
                                 color = Color(0xFFE74C3C),
                                 fontSize = 10.sp,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
@@ -283,9 +323,12 @@ fun HistoryContactItem(groupedCallLog: GroupedCallLog,
                 if (showReportDialog) {
                     ReportDialog(
                         phoneNumber = groupedCallLog.phoneNumber,
+                        reporterPhone = reporterPhone,
                         onDismiss = { showReportDialog = false },
+                        uiState = reportUiState,
                         onSubmit = { reportRequest ->
                             onReportClick(reportRequest)
+                            Log.d("Reported check","Clicked historyContactItem to report, request by HistoryContactItem = $reportRequest")
                         }
                     )
                 }
@@ -297,9 +340,9 @@ fun HistoryContactItem(groupedCallLog: GroupedCallLog,
                         .background(Color(0xFF2C2C2E), shape = MaterialTheme.shapes.medium)
                         .clip(MaterialTheme.shapes.medium)
                 ) {
-                    ActionItem(Icons.Default.Message, "Tin nhắn")
+                    ActionItem(Icons.Default.Message, "Tin nhắn", {})
                     Divider(color = Color.Black.copy(alpha = 0.3f))
-                    ActionItem(Icons.Default.History, "Nhật ký")
+                    ActionItem(Icons.Default.History, "Nhật ký", {openCallLogDetail(groupedCallLog.phoneNumber)})
                 }
             }
         }

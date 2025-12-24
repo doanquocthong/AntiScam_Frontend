@@ -1,15 +1,18 @@
 package com.example.antiscam.screens.contact
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.telecom.TelecomManager
 import android.util.Log
 import android.widget.Toast
+import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -25,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -36,12 +40,17 @@ import com.example.antiscam.data.model.enums.ContactTab
 import com.example.antiscam.data.repository.CallLogRepository
 import com.example.antiscam.data.repository.ContactRepository
 import com.example.antiscam.data.repository.ScamCheckRepository
+import com.example.antiscam.screens.auth.AuthViewModel
+import com.example.antiscam.screens.components.Notification
+import com.example.antiscam.screens.components.NotificationType
 import com.example.antiscam.screens.report.ReportViewModel
-import kotlinx.coroutines.flow.collect
 
+@SuppressLint("ContextCastToActivity")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ContactScreen() {
+fun ContactScreen(
+    openCallLogDetail: (String) -> Unit,
+) {
     val context = LocalContext.current
 
     // Theo dõi trạng thái app làm default dialer
@@ -109,7 +118,17 @@ fun ContactScreen() {
     val uiState by viewModel.uiState.collectAsState()
     val reportViewModel: ReportViewModel = viewModel()
     val reportUiState by reportViewModel.uiState.collectAsState()
-    var reportDialogVisible by remember { mutableStateOf<String?>(null) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    var notificationType by remember {
+        mutableStateOf(NotificationType.SUCCESS)
+    }
+    val authViewModel: AuthViewModel =
+        viewModel(LocalContext.current as ComponentActivity)
+
+    val reporterPhone by authViewModel.reporterPhone.collectAsState()
+
+    Log.d("reporterPhone - ContactScreen", "Current default = $reporterPhone")
+
 
     // Kiểm tra quyền và xử lý effect
     LaunchedEffect(Unit) {
@@ -140,6 +159,29 @@ fun ContactScreen() {
             e.printStackTrace()
         }
     }
+    LaunchedEffect(
+        reportUiState.isSuccess,
+        reportUiState.errorMessage
+    ) {
+        when {
+            reportUiState.isSuccess -> {
+                notificationType = NotificationType.SUCCESS
+                snackbarHostState.showSnackbar(
+                    "Báo cáo đã được gửi đi"
+                )
+                reportViewModel.resetState()
+            }
+
+            reportUiState.errorMessage != null -> {
+                notificationType = NotificationType.ERROR
+                snackbarHostState.showSnackbar(
+                    reportUiState.errorMessage!!
+                )
+                reportViewModel.resetState()
+            }
+        }
+    }
+
 
     val callPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -188,6 +230,14 @@ fun ContactScreen() {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         containerColor = Color.Black,
+        snackbarHost = {
+            SnackbarHost(hostState = snackbarHostState) { data ->
+                Notification(
+                    message = data.visuals.message,
+                    type = notificationType
+                )
+            }
+        },
         topBar = {
             Column(
                 modifier = Modifier
@@ -319,11 +369,23 @@ fun ContactScreen() {
                                 items(uiState.todayCallLogs) { log ->
                                     HistoryContactItem(
                                         groupedCallLog = log,
-                                        onCallClick = { handleCallRequest(it.phoneNumber, it.contactName) },
+                                        openCallLogDetail = openCallLogDetail,
+                                        reporterPhone = reporterPhone,
+                                        onCallClick = {
+                                            handleCallRequest(
+                                                it.phoneNumber,
+                                                it.contactName
+                                            )
+                                        },
                                         onReportClick = { request ->
                                             reportViewModel.submitReport(request)
+                                            Log.d(
+                                                "Reported check",
+                                                "Clicked historyContactItem to report by ContactScreen, request = $request"
+                                            )
                                         },
-                                        onDelete = {log ->
+                                        reportUiState = reportUiState,
+                                        onDelete = { log ->
                                             viewModel.deleteCallLog(log.id)
                                         }
                                     )
@@ -342,11 +404,19 @@ fun ContactScreen() {
                                 items(uiState.yesterdayCallLogs) { log ->
                                     HistoryContactItem(
                                         groupedCallLog = log,
-                                        onCallClick = { handleCallRequest(it.phoneNumber, it.contactName) },
+                                        reporterPhone = reporterPhone,
+                                        openCallLogDetail = openCallLogDetail,
+                                        onCallClick = {
+                                            handleCallRequest(
+                                                it.phoneNumber,
+                                                it.contactName
+                                            )
+                                        },
                                         onReportClick = { request ->
                                             reportViewModel.submitReport(request)
                                         },
-                                        onDelete = {log ->
+                                        reportUiState = reportUiState,
+                                        onDelete = { log ->
                                             viewModel.deleteCallLog(log.id)
                                         }
                                     )
@@ -365,11 +435,19 @@ fun ContactScreen() {
                                 items(uiState.olderCallLogs) { log ->
                                     HistoryContactItem(
                                         groupedCallLog = log,
-                                        onCallClick = { handleCallRequest(it.phoneNumber, it.contactName) },
+                                        openCallLogDetail = openCallLogDetail,
+                                        reporterPhone = reporterPhone,
+                                        onCallClick = {
+                                            handleCallRequest(
+                                                it.phoneNumber,
+                                                it.contactName
+                                            )
+                                        },
                                         onReportClick = { request ->
                                             reportViewModel.submitReport(request)
                                         },
-                                        onDelete = {log ->
+                                        reportUiState = reportUiState,
+                                        onDelete = { log ->
                                             viewModel.deleteCallLog(log.id)
                                         }
                                     )
@@ -383,7 +461,7 @@ fun ContactScreen() {
                             item { EmptyState("Chưa có liên hệ") }
                         } else {
                             items(uiState.filteredContacts) { contact ->
-                                ContactItem(contact) { selected ->
+                                ContactItem(contact, openCallLogDetail) { selected ->
                                     handleCallRequest(selected.phoneNumber, selected.name)
                                 }
                             }
@@ -444,42 +522,127 @@ private fun ScamWarningDialog(
     onContinue: () -> Unit
 ) {
     AlertDialog(
+        modifier = Modifier.border(
+            width = 1.dp,
+            color = Color(0xFFDACACA),
+            shape = MaterialTheme.shapes.small
+        ),
         onDismissRequest = onDismiss,
+        containerColor = Color(0xFF1C1C1E),
+        textContentColor = Color.White,
         title = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 Icon(
-                    Icons.Default.Warning,
+                    imageVector = Icons.Default.Warning,
                     contentDescription = null,
-                    tint = Color(0xFFFF453A),
-                    modifier = Modifier.padding(end = 8.dp)
+                    tint = Color(0xFFB71C1C),
+                    modifier = Modifier.size(26.dp)
                 )
                 Text(
                     text = "Cảnh báo lừa đảo",
-                    color = Color(0xFFFF453A),
-                    style = MaterialTheme.typography.titleLarge
+                    color = Color(0xFFB71C1C),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
                 )
             }
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("Số ${alert.phoneNumber} đã bị báo cáo ${alert.count} lần.", color = Color.White)
-                Text("Trạng thái: ${alert.status}", color = Color.White)
-                alert.lastReport?.let { Text("Báo cáo gần nhất: $it", color = Color.Gray) }
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+
+                // 🔴 Banner cảnh báo
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(
+                            width = 1.dp,
+                            color = Color(0xFFB71C1C),
+                            shape = MaterialTheme.shapes.small
+                        ),
+                    color = Color(0xFFB71C1C).copy(alpha = 0.15f),
+                    shape = MaterialTheme.shapes.small
+                ) {
+                    Text(
+                        text = "Số điện thoại này đã bị nhiều người báo cáo là lừa đảo.",
+                        color = Color(0xFFB71C1C),
+                        modifier = Modifier.padding(12.dp),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+
+                // ☎️ Số điện thoại
+                InfoRow(
+                    label = "Số điện thoại",
+                    value = alert.phoneNumber,
+                    valueColor = Color.White
+                )
+
+                // 📊 Số lần báo cáo
+                InfoRow(
+                    label = "Số lần bị báo cáo",
+                    value = "${alert.count} lần",
+                    valueColor = Color(0xFFFF9F0A) // vàng cảnh báo
+                )
+
+                // 🟠 Trạng thái
+                InfoRow(
+                    label = "Trạng thái",
+                    value = alert.status,
+                    valueColor = Color(0xFFE74C3C)
+                )
+
+                // 🕒 Báo cáo gần nhất
+                alert.lastReport?.let {
+                    InfoRow(
+                        label = "Báo cáo gần nhất",
+                        value = it,
+                        valueColor = Color.Gray
+                    )
+                }
             }
         },
         confirmButton = {
-            TextButton(onClick = onContinue) {
-                Text("Tiếp tục gọi")
+            Button(
+                onClick = onContinue,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFFB71C1C)
+                )
+            ) {
+                Text("Tiếp tục gọi", color = Color.White)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Huỷ")
+                Text("Huỷ", color = Color.White)
             }
-        },
-        containerColor = Color(0xFF1C1C1E),
-        textContentColor = Color.White
+        }
     )
+}
+
+@Composable
+private fun InfoRow(
+    label: String,
+    value: String,
+    valueColor: Color
+) {
+    Column {
+        Text(
+            text = label,
+            color = Color.Gray,
+            fontSize = 12.sp
+        )
+        Text(
+            text = value,
+            color = valueColor,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium
+        )
+    }
 }
 
 private fun launchCallIntent(context: Context, phoneNumber: String) {

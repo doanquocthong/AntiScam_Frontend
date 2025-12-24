@@ -12,5 +12,6 @@ data class Message(
     val date: Long,               // Thời gian gửi/nhận
     val type: Int,                // Loại tin nhắn: 1 = inbox, 2 = sent, 3 = draft,...
     val isScam: Boolean = false,   // Cờ đánh dấu tin nhắn lừa đảo (mặc định false)
-    val isSentByUser: Boolean // true nếu là tin nhắn do user gửi, false nếu nhận
+    val isSentByUser: Boolean, // true nếu là tin nhắn do user gửi, false nếu nhận
+    val isRead: Boolean = false
 )

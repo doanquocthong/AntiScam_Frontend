@@ -5,5 +5,6 @@ data class ScamCheckResponse(
     val reported: Boolean = false,
     val count: Long = 0,
     val status: String = "",
-    val lastReport: String = ""
+    val lastReport: String = "",
+    val isScam: Boolean = false
 )

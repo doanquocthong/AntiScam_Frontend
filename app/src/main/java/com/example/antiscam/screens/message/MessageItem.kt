@@ -23,24 +23,33 @@ fun MessageItem(
     address: String,
     latestMessage: String,
     latestTime: Long,
-    onClick: () -> Unit
+    isRead: Boolean,
+    unReadCount: Int,
+    openMessageDetail: () -> Unit
 ) {
     fun formatTimestamp(timestamp: Long): String {
         val formatter = SimpleDateFormat("HH:mm, dd/MM/yyyy", Locale.getDefault())
         return formatter.format(Date(timestamp))
     }
+
     val formattedDate = formatTimestamp(latestTime)
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onClick() }
-            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .clickable { openMessageDetail() }
+            .padding(horizontal = 18.dp, vertical = 8.dp)
             .clip(MaterialTheme.shapes.medium)
-            .background(Color(0xFF1C1C1E))
-            .padding(16.dp)
+            .background(Color(0xFF2C2C2E))
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.weight(1f)) {
+
+        // ===== Left content =====
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
 
             // Số điện thoại
             Text(
@@ -54,17 +63,43 @@ fun MessageItem(
                 text = latestMessage,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                color = Color.Gray,
+                color = if (unReadCount > 0) Color.White else Color.Gray,
                 style = MaterialTheme.typography.bodyMedium
             )
         }
 
-        // Thời gian
-        Text(
-            text = formattedDate,
-            color = Color.Gray,
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.align(Alignment.CenterVertically)
-        )
+        Spacer(modifier = Modifier.width(12.dp))
+
+        // ===== Right content =====
+        Column(
+            horizontalAlignment = Alignment.End,
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+
+            // Thời gian
+            Text(
+                text = formattedDate,
+                color = if (unReadCount > 0) Color.White else Color.Gray,
+                style = MaterialTheme.typography.bodySmall
+            )
+
+            // Badge số tin chưa đọc
+            if (unReadCount > 0) {
+                Surface(
+                    color = Color(0xFF2196F3),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(
+                        text = unReadCount.toString(),
+                        color = Color(0xFF38383A),
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(
+                            horizontal = 8.dp,
+                            vertical = 2.dp
+                        )
+                    )
+                }
+            }
+        }
     }
 }

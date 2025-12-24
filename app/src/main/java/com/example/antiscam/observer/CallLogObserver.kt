@@ -6,6 +6,8 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.CallLog
 import android.util.Log
+import com.example.antiscam.data.model.response.ScamCheckResponse
+import com.example.antiscam.data.repository.ScamCheckRepository
 import com.example.antiscam.di.ServiceLocator.callLogRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -37,26 +39,28 @@ class CallLogObserver(
                     "${CallLog.Calls.DATE} DESC"
                 )
 
-                cursor?.use {
-                    if (!it.moveToFirst()) return@launch
+                cursor?.use { c ->
+                    if (!c.moveToFirst()) return@launch
 
                     val number =
-                        it.getString(it.getColumnIndexOrThrow(CallLog.Calls.NUMBER))
+                        c.getString(c.getColumnIndexOrThrow(CallLog.Calls.NUMBER))
+                            ?: return@launch
+
                     val type =
-                        it.getInt(it.getColumnIndexOrThrow(CallLog.Calls.TYPE))
+                        c.getInt(c.getColumnIndexOrThrow(CallLog.Calls.TYPE))
+
                     val date =
-                        it.getLong(it.getColumnIndexOrThrow(CallLog.Calls.DATE))
+                        c.getLong(c.getColumnIndexOrThrow(CallLog.Calls.DATE))
+
                     val duration =
-                        it.getLong(it.getColumnIndexOrThrow(CallLog.Calls.DURATION))
+                        c.getLong(c.getColumnIndexOrThrow(CallLog.Calls.DURATION))
 
                     Log.d(
                         TAG,
                         "Latest call → number=$number type=$type duration=$duration"
                     )
 
-                    // ⚠️ QUAN TRỌNG:
-                    // CallLog được ghi nhiều lần.
-                    // Chỉ insert khi call đã kết thúc:
+                    // ✅ Chỉ xử lý khi call đã kết thúc
                     val shouldInsert =
                         type == CallLog.Calls.MISSED_TYPE || duration > 0
 
@@ -65,11 +69,23 @@ class CallLogObserver(
                         return@launch
                     }
 
+                    // ✅ GỌI API CHECK SCAM
+                    val scamCheckRepository = ScamCheckRepository()
+
+                    val response = scamCheckRepository.checkPhoneNumber(number)
+                    Log.d(TAG, "response = ${response}")
+                    // ✅ UNWRAP ApiResponse → Boolean
+                    val isScam = response?.data?.isScam ?: false
+
+                    Log.d(TAG, "Scam check result → isScam=$isScam")
+
+                    // ✅ INSERT DB
                     callLogRepository.insertFromSystem(
                         phoneNumber = number,
                         callType = type,
                         timestamp = date,
-                        duration = duration
+                        duration = duration,
+                        isScam = isScam
                     )
                 }
             } catch (e: Exception) {
@@ -77,6 +93,7 @@ class CallLogObserver(
             }
         }
     }
+
 
     companion object {
         private const val TAG = "CallLogObserver"

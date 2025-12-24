@@ -9,13 +9,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-data class ReportUiState(
-    val isLoading: Boolean = false,
-    val isSuccess: Boolean = false,
-    val errorMessage: String? = null,
-    val response: ReportResponse? = null
-)
-
 class ReportViewModel(
     private val reportRepository: ReportRepository = ReportRepository()
 ) : ViewModel() {
@@ -41,7 +34,7 @@ class ReportViewModel(
                 _uiState.value = ReportUiState(
                     isLoading = false,
                     isSuccess = false,
-                    errorMessage = "Không thể gửi báo cáo! Vui lòng thử lại."
+                    errorMessage = "Bạn đã gửi tối đa 2 báo cáo/ngày cho số điện thoại này."
                 )
             }
         }

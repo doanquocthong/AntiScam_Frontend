@@ -7,7 +7,7 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 object RetrofitClient {
-    private val BASE_URL = Constants.BASE_URL
+    private const val BASE_URL = Constants.BASE_URL
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
         level = HttpLoggingInterceptor.Level.BODY
     }

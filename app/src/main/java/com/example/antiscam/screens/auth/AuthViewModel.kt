@@ -11,11 +11,14 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.PhoneAuthCredential
 import com.google.firebase.auth.PhoneAuthOptions
 import com.google.firebase.auth.PhoneAuthProvider
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import java.util.concurrent.TimeUnit
 
 private const val TAG = "AuthViewModel"
 
 class AuthViewModel : ViewModel() {
+
 
     private val auth = FirebaseAuth.getInstance()
 
@@ -27,7 +30,18 @@ class AuthViewModel : ViewModel() {
 
     var errorMessage by mutableStateOf<String?>(null)
         private set
+    private val _reporterPhone = MutableStateFlow<String?>(null)
+    val reporterPhone: StateFlow<String?> = _reporterPhone
+    fun setReporterPhone(phone: String) {
+        _reporterPhone.value = phone
+    }
 
+    init {
+        FirebaseAuth.getInstance().currentUser?.phoneNumber?.let {
+            _reporterPhone.value = it
+            Log.d("AuthVM", "Init reporterPhone = $it")
+        }
+    }
     // ============================
     // 📩 SEND OTP
     // ============================
@@ -39,7 +53,8 @@ class AuthViewModel : ViewModel() {
         Log.d(TAG, "sendOtp() called")
         Log.d(TAG, "Phone = $phone")
         Log.d(TAG, "Activity = ${activity::class.java.simpleName}")
-
+        setReporterPhone(phone)
+        Log.d(TAG, "Đã lưu số điện thoại = ${setReporterPhone(phone)}")
         loading = true
         errorMessage = null
 

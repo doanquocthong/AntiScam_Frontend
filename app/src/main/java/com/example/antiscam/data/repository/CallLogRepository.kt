@@ -36,7 +36,7 @@ class CallLogRepository(context: Context) {
     fun getCallLogsByPhoneNumber(phoneNumber: String): Flow<List<CallLog>> {
         return callLogDao.getCallLogsByPhoneNumber(phoneNumber)
     }
-    
+
     suspend fun insertCallLog(callLog: CallLog) {
         try {
             callLogDao.insertCallLog(callLog)
@@ -154,7 +154,8 @@ class CallLogRepository(context: Context) {
         phoneNumber: String,
         callType: Int,
         timestamp: Long,
-        duration: Long
+        duration: Long,
+        isScam: Boolean,
     ) {
         val callTypeStr = when (callType) {
             SystemCallLog.Calls.OUTGOING_TYPE -> "OUTGOING"
@@ -176,14 +177,18 @@ class CallLogRepository(context: Context) {
         val avatarColor = colors[
             phoneNumber.hashCode().absoluteValue % colors.size
         ].toInt()
+        android.util.Log.d(
+            "CallLogRepository",
+            "isScam = $isScam",
 
+        )
         val callLog = CallLog(
             phoneNumber = phoneNumber,
             contactName = null,          // system chưa resolve
             callType = callTypeStr,
             timestamp = timestamp,
             duration = duration.toInt(),
-            isScam = false,
+            isScam = isScam,
             avatarColor = avatarColor
         )
 

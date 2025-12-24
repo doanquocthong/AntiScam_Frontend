@@ -14,7 +14,7 @@ interface ScamApiService {
     @GET("api/reports/check")
     suspend fun checkPhone(@Query("phone") phone: String): ApiResponse<ScamCheckResponse>
 
-    @POST("api/reports")
+    @POST("api/reports/create")
     suspend fun reportPhone(@Body request: ReportRequest): ApiResponse<ReportResponse>
 }
 

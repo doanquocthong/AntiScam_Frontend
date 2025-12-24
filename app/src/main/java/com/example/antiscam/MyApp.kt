@@ -27,7 +27,7 @@ class MyApp : Application() {
 
             CoroutineScope(Dispatchers.IO).launch {
                 ServiceLocator.callLogRepository.syncFromSystemCallLog(this@MyApp)
-
+                ServiceLocator.messageRepository.syncFromSystemMessages(this@MyApp)
                 prefs.edit { putBoolean("first_sync_done", true) }
 
                 Log.d("MyAppPrefs", "✔ Sync xong – đã set first_sync_done = true")

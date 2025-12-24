@@ -22,7 +22,7 @@ data class CallLog (
     val callType: String,              // Loại: "INCOMING", "OUTGOING", "MISSED"
     val timestamp: Long,               // Thời gian cuộc gọi (epoch millis)
     val duration: Int = 0,             // Thời lượng (giây)
-    val isScam: Boolean = false,       // Có phải số nghi ngờ lừa đảo không
+    val isScam: Boolean,       // Có phải số nghi ngờ lừa đảo không
     val note: String? = null,          // Ghi chú (nếu người dùng đánh dấu)
     val avatarColor: Int = 0           // Mã màu avatar (ARGB)
 )

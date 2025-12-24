@@ -19,4 +19,19 @@ interface MessageDao {
 
     @Query("DELETE FROM messages")
     suspend fun deleteAllMessages()
+
+    @Query("""
+    UPDATE messages
+    SET isRead = 1
+    WHERE address = :address
+    """)
+    suspend fun markMessageAsRead(address: String)
+
+    @Query("""
+    SELECT * FROM messages
+    WHERE address = :address
+    ORDER BY date ASC
+    """)
+    fun getMessagesByAddress(address: String): Flow<List<Message>>
+
 }

@@ -1,7 +1,6 @@
 package com.example.antiscam.screens.navigation
-
-import MessageScreen
 import android.R.attr.layoutDirection
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -23,55 +22,70 @@ import com.example.antiscam.screens.contact.ContactScreen
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.navigation.NavController
+import com.example.antiscam.screens.message.MessageDetailScreen
+import com.example.antiscam.screens.message.MessageScreen
 
 @Composable
-fun MainScreen() {
+fun MainScreen(navController: NavController) {
     var selectedTab by remember { mutableStateOf(0) }
 
+    // 👉 state để mở màn hình chi tiết
+    var openedAddress by remember { mutableStateOf<String?>(null) }
+
     Scaffold(
-        containerColor = Color.Black,  // Nền chính scaffold màu đen
+        containerColor = Color.Black,
         bottomBar = {
-            NavigationBar(
-                containerColor = Color(0xFF121212)  // Nền bottom nav màu tối hơn chút
-            ) {
-                NavigationBarItem(
-                    icon = { Icon(Icons.Default.Call, contentDescription = "Call", tint = Color.White) },
-                    label = { Text("Điện thoại", color = Color.White) },
-                    selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = Color.Cyan,
-                        selectedTextColor = Color.Cyan,
-                        unselectedIconColor = Color.Gray,
-                        unselectedTextColor = Color.Gray,
-                        indicatorColor = Color(0xFF222222)
+            if (openedAddress == null) { // Ẩn bottom bar khi xem chi tiết
+                NavigationBar(
+                    containerColor = Color(0xFF121212)
+                ) {
+                    NavigationBarItem(
+                        icon = { Icon(Icons.Default.Call, contentDescription = null) },
+                        label = { Text("Điện thoại") },
+                        selected = selectedTab == 0,
+                        onClick = { selectedTab = 0 },
+                        colors = NavigationBarItemDefaults.colors( selectedIconColor = Color.White, selectedTextColor = Color.White, unselectedIconColor = Color.Gray, unselectedTextColor = Color.Gray, indicatorColor = Color(0xFF222222) )
                     )
-                )
-                NavigationBarItem(
-                    icon = { Icon(Icons.Default.Message, contentDescription = "Message", tint = Color.White) },
-                    label = { Text("Tin nhắn", color = Color.White) },
-                    selected = selectedTab == 1,
-                    onClick = { selectedTab = 1 },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = Color.Cyan,
-                        selectedTextColor = Color.Cyan,
-                        unselectedIconColor = Color.Gray,
-                        unselectedTextColor = Color.Gray,
-                        indicatorColor = Color(0xFF222222)
+                    NavigationBarItem(
+                        icon = { Icon(Icons.Default.Message, contentDescription = null) },
+                        label = { Text("Tin nhắn") },
+                        selected = selectedTab == 1,
+                        onClick = { selectedTab = 1 },
+                        colors = NavigationBarItemDefaults.colors( selectedIconColor = Color.White, selectedTextColor = Color.White, unselectedIconColor = Color.Gray, unselectedTextColor = Color.Gray, indicatorColor = Color(0xFF222222) )
                     )
-                )
+                }
             }
         }
-    ) { innerPadding ->
+    ) { padding ->
+
         Box(
             modifier = Modifier
-                .padding(innerPadding)
+                .padding(padding)
                 .fillMaxSize()
-                .background(Color.Black)  // Nền màn hình con cũng màu đen
         ) {
-            when (selectedTab) {
-                0 -> ContactScreen()
-                1 -> MessageScreen()
+            Log.d("openedAddress= ", "${openedAddress}")
+            when {
+                // 👉 Màn hình chi tiết
+                openedAddress != null -> {
+                    MessageDetailScreen (
+                        address = openedAddress!!,
+                        onBack = { openedAddress = null }
+                    )
+                }
+
+                // 👉 Tab bình thường
+                selectedTab == 0 -> ContactScreen(
+                    openCallLogDetail = { phoneNumber ->
+                        navController.navigate("call_log/$phoneNumber")
+                    }
+                )
+
+                selectedTab == 1 -> MessageScreen(
+                    onOpenMessageDetail = { address ->
+                        openedAddress = address
+                    }
+                )
             }
         }
     }

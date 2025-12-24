@@ -3,6 +3,7 @@ package com.example.antiscam.di
 import android.content.Context
 import com.example.antiscam.data.repository.CallLogRepository
 import com.example.antiscam.data.repository.ContactRepository
+import com.example.antiscam.data.repository.MessageRepository
 import com.example.antiscam.data.repository.ScamCheckRepository
 
 object ServiceLocator {
@@ -13,5 +14,9 @@ object ServiceLocator {
 
     val callLogRepository: CallLogRepository by lazy {
         CallLogRepository(appContext)
+    }
+
+    val messageRepository: MessageRepository by lazy {
+        MessageRepository(appContext)
     }
 }

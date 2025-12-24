@@ -11,7 +11,7 @@ data class GroupedCallLog(
     val lastCallTimestamp: Long,          // Thời gian cuộc gọi gần nhất
     val lastCallType: String,             // Loại cuộc gọi gần nhất
     val avatarColor: Int,                  // Mã màu avatar
-    val isScam: Boolean = false,          // Có phải số lừa đảo không
+    val isScam: Boolean,          // Có phải số lừa đảo không
     val totalDuration: Int = 0             // Tổng thời lượng tất cả cuộc gọi
 )
 
