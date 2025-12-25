@@ -54,7 +54,7 @@ fun ContactItem(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .padding(horizontal = 16.dp, vertical = 4.dp)
             .clip(MaterialTheme.shapes.medium)
             .background(Color(0xFF1C1C1E))
             .clickable { expanded = !expanded }

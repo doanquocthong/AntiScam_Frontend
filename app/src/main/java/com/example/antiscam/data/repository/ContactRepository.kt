@@ -1,5 +1,6 @@
 package com.example.antiscam.data.repository
 
+import android.content.ContentProviderOperation
 import android.content.Context
 import android.provider.ContactsContract
 import com.example.antiscam.data.model.Contact
@@ -47,4 +48,72 @@ class ContactRepository(private val context: Context) {
         }
         return contacts
     }
+
+    fun addContact(
+        name: String,
+        phoneNumber: String
+    ): Boolean {
+        return try {
+            val ops = ArrayList<ContentProviderOperation>()
+
+            // 1️⃣ Tạo RawContact
+            ops.add(
+                ContentProviderOperation.newInsert(ContactsContract.RawContacts.CONTENT_URI)
+                    .withValue(ContactsContract.RawContacts.ACCOUNT_TYPE, null)
+                    .withValue(ContactsContract.RawContacts.ACCOUNT_NAME, null)
+                    .build()
+            )
+
+            // 2️⃣ Thêm tên
+            ops.add(
+                ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
+                    .withValueBackReference(
+                        ContactsContract.Data.RAW_CONTACT_ID,
+                        0
+                    )
+                    .withValue(
+                        ContactsContract.Data.MIMETYPE,
+                        ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE
+                    )
+                    .withValue(
+                        ContactsContract.CommonDataKinds.StructuredName.DISPLAY_NAME,
+                        name
+                    )
+                    .build()
+            )
+
+            // 3️⃣ Thêm số điện thoại
+            ops.add(
+                ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
+                    .withValueBackReference(
+                        ContactsContract.Data.RAW_CONTACT_ID,
+                        0
+                    )
+                    .withValue(
+                        ContactsContract.Data.MIMETYPE,
+                        ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE
+                    )
+                    .withValue(
+                        ContactsContract.CommonDataKinds.Phone.NUMBER,
+                        phoneNumber
+                    )
+                    .withValue(
+                        ContactsContract.CommonDataKinds.Phone.TYPE,
+                        ContactsContract.CommonDataKinds.Phone.TYPE_MOBILE
+                    )
+                    .build()
+            )
+
+            context.contentResolver.applyBatch(
+                ContactsContract.AUTHORITY,
+                ops
+            )
+
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
 }

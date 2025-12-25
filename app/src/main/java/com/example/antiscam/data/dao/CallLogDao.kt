@@ -28,5 +28,15 @@ interface CallLogDao {
     
     @Query("DELETE FROM call_logs")
     suspend fun deleteAllCallLogs()
+
+    @Query("""
+        UPDATE call_logs 
+        SET contactName = :contactName
+        WHERE phoneNumber = :phoneNumber
+    """)
+    suspend fun updateContactNameByPhone(
+        phoneNumber: String,
+        contactName: String
+    )
 }
 

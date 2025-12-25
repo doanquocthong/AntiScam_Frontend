@@ -2,6 +2,7 @@ package com.example.antiscam.data.network
 
 import com.example.antiscam.data.model.request.ReportRequest
 import com.example.antiscam.data.model.response.ApiResponse
+import com.example.antiscam.data.model.response.MessageResponse
 import com.example.antiscam.data.model.response.ReportResponse
 import com.example.antiscam.data.model.response.ScamCheckResponse
 import retrofit2.http.Body
@@ -16,5 +17,8 @@ interface ScamApiService {
 
     @POST("api/reports/create")
     suspend fun reportPhone(@Body request: ReportRequest): ApiResponse<ReportResponse>
+
+    @POST("/api/scam/check")
+    suspend fun checkMessage(@Body message: String): ApiResponse<MessageResponse>
 }
 

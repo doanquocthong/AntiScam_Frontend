@@ -1,11 +1,21 @@
 package com.example.antiscam.data.model
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "messages")
+@Entity(
+    tableName = "messages",
+    indices = [
+        Index(
+            value = ["address", "date", "body"],
+            unique = true
+        )
+    ]
+)
+
 data class Message(
-    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val address: String,          // Số điện thoại gửi/nhận
     val contactName: String?,     // Tên liên hệ nếu có
     val body: String,             // Nội dung tin nhắn

@@ -5,12 +5,14 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
 import android.telecom.TelecomManager
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -18,7 +20,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
@@ -34,6 +35,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.antiscam.data.model.GroupedCallLog
 import com.example.antiscam.data.model.PendingCall
 import com.example.antiscam.data.model.ScamAlert
 import com.example.antiscam.data.model.enums.ContactTab
@@ -44,7 +46,13 @@ import com.example.antiscam.screens.auth.AuthViewModel
 import com.example.antiscam.screens.components.Notification
 import com.example.antiscam.screens.components.NotificationType
 import com.example.antiscam.screens.report.ReportViewModel
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+import androidx.core.content.edit
 
+@RequiresApi(Build.VERSION_CODES.O)
 @SuppressLint("ContextCastToActivity")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,16 +61,16 @@ fun ContactScreen(
 ) {
     val context = LocalContext.current
 
-    // Theo dõi trạng thái app làm default dialer
-    var isDefaultDialer by remember { mutableStateOf(isDefaultDialer(context)) }
-
-    // Launcher để mở màn hình đổi ứng dụng gọi mặc định và nhận kết quả
-    val defaultDialerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) {
-        // Cập nhật lại trạng thái dialer mặc định sau khi user chọn xong
-        isDefaultDialer = isDefaultDialer(context)
-    }
+//    // Theo dõi trạng thái app làm default dialer
+//    var isDefaultDialer by remember { mutableStateOf(isDefaultDialer(context)) }
+////
+//    // Launcher để mở màn hình đổi ứng dụng gọi mặc định và nhận kết quả
+//    val defaultDialerLauncher = rememberLauncherForActivityResult(
+//        contract = ActivityResultContracts.StartActivityForResult()
+//    ) {
+//        // Cập nhật lại trạng thái dialer mặc định sau khi user chọn xong
+//        isDefaultDialer = isDefaultDialer(context)
+//    }
 
     var pendingPermissionCall by remember { mutableStateOf<PendingCall?>(null) }
     var hasContactPermission by remember {
@@ -115,6 +123,7 @@ fun ContactScreen(
         )
     )
 
+
     val uiState by viewModel.uiState.collectAsState()
     val reportViewModel: ReportViewModel = viewModel()
     val reportUiState by reportViewModel.uiState.collectAsState()
@@ -128,6 +137,57 @@ fun ContactScreen(
     val reporterPhone by authViewModel.reporterPhone.collectAsState()
 
     Log.d("reporterPhone - ContactScreen", "Current default = $reporterPhone")
+    val prefs = remember {
+        context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+    }
+
+    var firstCallLogSyncDone by remember {
+        mutableStateOf(
+            prefs.getBoolean("first_calllog_sync_done", false)
+        )
+    }
+
+
+    var hasCallLogPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.READ_CALL_LOG
+            ) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+    val callLogPermissionLauncher =
+        rememberLauncherForActivityResult(
+            ActivityResultContracts.RequestPermission()
+        ) { granted ->
+            hasCallLogPermission = granted
+            if (!granted) {
+                Toast.makeText(
+                    context,
+                    "Cần quyền truy cập lịch sử cuộc gọi",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+
+    LaunchedEffect(viewModel) {
+        if (!hasCallLogPermission) {
+            callLogPermissionLauncher.launch(
+                Manifest.permission.READ_CALL_LOG
+            )
+        }
+    }
+
+    LaunchedEffect(hasCallLogPermission) {
+        if (hasCallLogPermission && !firstCallLogSyncDone) {
+            Log.d("CallLogSync", "🔄 First time sync CallLog")
+            viewModel.syncCallLogs() {
+                prefs.edit { putBoolean("first_calllog_sync_done", true) }
+                firstCallLogSyncDone = true
+            }
+
+        }
+    }
 
 
     // Kiểm tra quyền và xử lý effect
@@ -152,7 +212,17 @@ fun ContactScreen(
                         launchCallIntent(context, effect.phoneNumber)
 
                     is ContactEffect.ShowToast ->
-                        Toast.makeText(context, effect.message, Toast.LENGTH_SHORT).show()
+                        Unit
+                    is ContactEffect.ContactAddFailed -> {
+                        notificationType = NotificationType.ERROR
+                        snackbarHostState.showSnackbar("Lỗi không xác định")
+                    }
+
+                    ContactEffect.ContactAddedSuccess -> {
+                        notificationType = NotificationType.SUCCESS
+                        snackbarHostState.showSnackbar("Đã thêm vào danh bạ")
+                    }
+
                 }
             }
         } catch (e: Exception) {
@@ -208,24 +278,42 @@ fun ContactScreen(
             callPermissionLauncher.launch(Manifest.permission.CALL_PHONE)
         }
     }
+//
+//    // Hàm gọi intent yêu cầu đổi ứng dụng gọi mặc định
+//    fun requestDefaultDialer() {
+//        val telecomManager =
+//            context.getSystemService(Context.TELECOM_SERVICE) as TelecomManager
+//
+//        Log.d("DialerCheck", "Current default = ${telecomManager.defaultDialerPackage}")
+//        Log.d("DialerCheck", "My package = ${context.packageName}")
+//
+//        val intent = Intent(TelecomManager.ACTION_CHANGE_DEFAULT_DIALER).apply {
+//            putExtra(
+//                TelecomManager.EXTRA_CHANGE_DEFAULT_DIALER_PACKAGE_NAME,
+//                context.packageName
+//            )
+//        }
+//        defaultDialerLauncher.launch(intent)
+//    }
 
-    // Hàm gọi intent yêu cầu đổi ứng dụng gọi mặc định
-    fun requestDefaultDialer() {
-        val telecomManager =
-            context.getSystemService(Context.TELECOM_SERVICE) as TelecomManager
+    var showAddContactDialog by remember { mutableStateOf(false) }
+    var selectedCallLog by remember { mutableStateOf<GroupedCallLog?>(null) }
+    val writeContactPermissionLauncher =
+        rememberLauncherForActivityResult(
+            ActivityResultContracts.RequestPermission()
+        ) { granted ->
+            if (granted && selectedCallLog != null) {
+                viewModel.addContactToPhoneBook(
+                    name = selectedCallLog!!.contactName ?: "",
+                    phoneNumber = selectedCallLog!!.phoneNumber
+                )
+            } else {
+                Toast.makeText(context, "Cần quyền ghi danh bạ", Toast.LENGTH_SHORT).show()
+            }
 
-        Log.d("DialerCheck", "Current default = ${telecomManager.defaultDialerPackage}")
-        Log.d("DialerCheck", "My package = ${context.packageName}")
-
-        val intent = Intent(TelecomManager.ACTION_CHANGE_DEFAULT_DIALER).apply {
-            putExtra(
-                TelecomManager.EXTRA_CHANGE_DEFAULT_DIALER_PACKAGE_NAME,
-                context.packageName
-            )
+            showAddContactDialog = false
+            selectedCallLog = null
         }
-        defaultDialerLauncher.launch(intent)
-    }
-
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -252,8 +340,6 @@ fun ContactScreen(
                         .fillMaxWidth()
                         .padding(horizontal = 12.dp, vertical = 8.dp)
                 ) {
-                    Icon(Icons.Default.Menu, contentDescription = null, tint = Color.Gray)
-                    Spacer(modifier = Modifier.width(8.dp))
                     TextField(
                         value = uiState.searchQuery,
                         onValueChange = viewModel::onSearchQueryChange,
@@ -313,45 +399,45 @@ fun ContactScreen(
                     .padding(padding)
                     .background(Color(0xFF0D0D0D))
             ) {
-                if (isDefaultDialer) {
-                    item {
-                        Card(
-                            colors = CardDefaults.cardColors(
-                                containerColor = Color(0xFF2C2C2E)
-                            ),
-                            modifier = Modifier
-                                .padding(12.dp)
-                                .fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    Icons.Default.Warning,
-                                    contentDescription = null,
-                                    tint = Color(0xFFFF9F0A)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = "Cần đặt làm ứng dụng gọi mặc định",
-                                        color = Color.White,
-                                        fontSize = 14.sp
-                                    )
-                                    Text(
-                                        text = "Để phát hiện & cảnh báo cuộc gọi lừa đảo",
-                                        color = Color.Gray,
-                                        fontSize = 12.sp
-                                    )
-                                }
-                                TextButton(onClick = { requestDefaultDialer() }) {
-                                    Text("Đặt ngay")
-                                }
-                            }
-                        }
-                    }
-                }
+//                if (isDefaultDialer) {
+//                    item {
+//                        Card(
+//                            colors = CardDefaults.cardColors(
+//                                containerColor = Color(0xFF2C2C2E)
+//                            ),
+//                            modifier = Modifier
+//                                .padding(12.dp)
+//                                .fillMaxWidth()
+//                        ) {
+//                            Row(
+//                                modifier = Modifier.padding(12.dp),
+//                                verticalAlignment = Alignment.CenterVertically
+//                            ) {
+//                                Icon(
+//                                    Icons.Default.Warning,
+//                                    contentDescription = null,
+//                                    tint = Color(0xFFFF9F0A)
+//                                )
+//                                Spacer(modifier = Modifier.width(8.dp))
+//                                Column(modifier = Modifier.weight(1f)) {
+//                                    Text(
+//                                        text = "Cần đặt làm ứng dụng gọi mặc định",
+//                                        color = Color.White,
+//                                        fontSize = 14.sp
+//                                    )
+//                                    Text(
+//                                        text = "Để phát hiện & cảnh báo cuộc gọi lừa đảo",
+//                                        color = Color.Gray,
+//                                        fontSize = 12.sp
+//                                    )
+//                                }
+//                                TextButton(onClick = { requestDefaultDialer() }) {
+//                                    Text("Đặt ngay")
+//                                }
+//                            }
+//                        }
+//                    }
+//                }
                 when (uiState.selectedTab) {
                     ContactTab.CallHistory -> {
                         if (uiState.filteredCallLogs.isEmpty()) {
@@ -387,6 +473,10 @@ fun ContactScreen(
                                         reportUiState = reportUiState,
                                         onDelete = { log ->
                                             viewModel.deleteCallLog(log.id)
+                                        },
+                                        onAddContactClick = {
+                                            selectedCallLog = it
+                                            showAddContactDialog = true
                                         }
                                     )
                                 }
@@ -418,6 +508,10 @@ fun ContactScreen(
                                         reportUiState = reportUiState,
                                         onDelete = { log ->
                                             viewModel.deleteCallLog(log.id)
+                                        },
+                                        onAddContactClick = {
+                                            selectedCallLog = it
+                                            showAddContactDialog = true
                                         }
                                     )
                                 }
@@ -449,6 +543,10 @@ fun ContactScreen(
                                         reportUiState = reportUiState,
                                         onDelete = { log ->
                                             viewModel.deleteCallLog(log.id)
+                                        },
+                                        onAddContactClick = {
+                                            selectedCallLog = it
+                                            showAddContactDialog = true
                                         }
                                     )
                                 }
@@ -470,6 +568,38 @@ fun ContactScreen(
                 }
             }
         }
+        if (showAddContactDialog && selectedCallLog != null) {
+            AddContactDialog(
+                phoneNumber = selectedCallLog!!.phoneNumber,
+                initialName = selectedCallLog!!.contactName,
+                onDismiss = {
+                    showAddContactDialog = false
+                    selectedCallLog = null
+                },
+                onConfirm = { name ->
+                    if (
+                        ContextCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.WRITE_CONTACTS
+                        ) == PackageManager.PERMISSION_GRANTED
+                    ) {
+                        viewModel.addContactToPhoneBook(
+                            name = name,
+                            phoneNumber = selectedCallLog!!.phoneNumber
+                        )
+
+                        showAddContactDialog = false
+                        selectedCallLog = null
+                    } else {
+                        // lưu tạm name nếu cần
+                        selectedCallLog = selectedCallLog!!.copy(contactName = name)
+                        writeContactPermissionLauncher.launch(Manifest.permission.WRITE_CONTACTS)
+                    }
+                }
+
+            )
+        }
+
     }
 
     uiState.scamAlert?.let { alert ->
@@ -515,6 +645,7 @@ fun FilterChip(text: String, selected: Boolean, onClick: () -> Unit) {
     }
 }
 
+@RequiresApi(Build.VERSION_CODES.O)
 @Composable
 private fun ScamWarningDialog(
     alert: ScamAlert,
@@ -600,7 +731,7 @@ private fun ScamWarningDialog(
                 alert.lastReport?.let {
                     InfoRow(
                         label = "Báo cáo gần nhất",
-                        value = it,
+                        value = formatLastReportTime(it),
                         valueColor = Color.Gray
                     )
                 }
@@ -623,6 +754,34 @@ private fun ScamWarningDialog(
         }
     )
 }
+
+@RequiresApi(Build.VERSION_CODES.O)
+fun formatLastReportTime(rawTime: String): String {
+    return try {
+        // 🔥 Chuẩn hoá chuỗi: xoá khoảng trắng thừa
+        val cleaned = rawTime
+            .replace(" ", "") // xoá mọi space
+            .let {
+                // nếu chưa có timezone thì thêm Z
+                if (it.endsWith("Z") || it.contains("+")) it
+                else it + "Z"
+            }
+
+        val instant = Instant.parse(cleaned)
+
+        val formatter = DateTimeFormatter
+            .ofPattern("dd/MM/yyyy · HH:mm")
+            .withLocale(Locale("vi", "VN"))
+            .withZone(ZoneId.systemDefault())
+
+        formatter.format(instant)
+
+    } catch (e: Exception) {
+        Log.e("TimeFormat", "Parse failed: $rawTime", e)
+        rawTime
+    }
+}
+
 
 @Composable
 private fun InfoRow(

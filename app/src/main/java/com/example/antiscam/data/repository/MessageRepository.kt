@@ -10,12 +10,17 @@ import androidx.core.content.ContextCompat
 import com.example.antiscam.data.dao.MessageDao
 import com.example.antiscam.data.database.AppDatabase
 import com.example.antiscam.data.model.Message
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.withContext
 
-class MessageRepository(context: Context) {
+class MessageRepository(
+    private val appContext: Context
+) {
 
-    private val database: AppDatabase = AppDatabase.getDatabase(context)
-    private val messageDao: MessageDao = database.messageDao()
+    private val database = AppDatabase.getDatabase(appContext)
+    private val messageDao = database.messageDao()
+
 
     fun getAllMessages(): Flow<List<Message>> {
         return messageDao.getAllMessages()
@@ -32,92 +37,113 @@ class MessageRepository(context: Context) {
     /**
      * Đồng bộ tin nhắn từ hệ thống vào database Room
      */
-    suspend fun syncFromSystemMessages(context: Context) {
-        if (ContextCompat.checkSelfPermission(
-                context,
+    suspend fun syncFromSystemMessages() = withContext(Dispatchers.IO) {
+
+        if (
+            ContextCompat.checkSelfPermission(
+                appContext,
                 Manifest.permission.READ_SMS
             ) != PackageManager.PERMISSION_GRANTED
         ) {
             Log.e("MessageRepository", "READ_SMS permission not granted!")
-            return
+            return@withContext
         }
+
+        val prefs = appContext.getSharedPreferences(
+            "sms_prefs",
+            Context.MODE_PRIVATE
+        )
+
+        val lastSyncedDate = prefs.getLong("last_sms_date", 0L)
+
+        val resolver = appContext.contentResolver
+        val smsUri = Telephony.Sms.CONTENT_URI
+
+        val cursor = resolver.query(
+            smsUri,
+            arrayOf(
+                Telephony.Sms._ID,
+                Telephony.Sms.ADDRESS,
+                Telephony.Sms.BODY,
+                Telephony.Sms.DATE,
+                Telephony.Sms.TYPE,
+                Telephony.Sms.READ
+            ),
+            "${Telephony.Sms.DATE} > ?",
+            arrayOf(lastSyncedDate.toString()),
+            "${Telephony.Sms.DATE} ASC"
+        )
 
         val messagesToInsert = mutableListOf<Message>()
+        var newestDate = lastSyncedDate
 
-        try {
-            val resolver = context.contentResolver
-            val smsUri: Uri = Telephony.Sms.CONTENT_URI
+        cursor?.use { c ->
+            val idIdx = c.getColumnIndexOrThrow(Telephony.Sms._ID)
+            val addressIdx = c.getColumnIndexOrThrow(Telephony.Sms.ADDRESS)
+            val bodyIdx = c.getColumnIndexOrThrow(Telephony.Sms.BODY)
+            val dateIdx = c.getColumnIndexOrThrow(Telephony.Sms.DATE)
+            val typeIdx = c.getColumnIndexOrThrow(Telephony.Sms.TYPE)
+            val readIdx = c.getColumnIndexOrThrow(Telephony.Sms.READ)
 
-            val cursor = resolver.query(
-                smsUri,
-                arrayOf(
-                    Telephony.Sms._ID,
-                    Telephony.Sms.ADDRESS,
-                    Telephony.Sms.BODY,
-                    Telephony.Sms.DATE,
-                    Telephony.Sms.TYPE,
-                    Telephony.Sms.READ
-                ),
-                null,
-                null,
-                "${Telephony.Sms.DATE} DESC"
-            )
+            while (c.moveToNext()) {
+//                val systemId = c.getLong(idIdx)
+                val address = c.getString(addressIdx) ?: ""
+                val body = c.getString(bodyIdx) ?: ""
+                val date = c.getLong(dateIdx)
+                val type = c.getInt(typeIdx)
+                val isRead = c.getInt(readIdx) == 1
 
-            cursor?.use { c ->
+                newestDate = maxOf(newestDate, date)
 
-                if (!c.moveToFirst()) {
-                    Log.w("MessageRepository", "SMS cursor empty")
-                    return
-                }
-
-                val addressIdx = c.getColumnIndexOrThrow(Telephony.Sms.ADDRESS)
-                val bodyIdx = c.getColumnIndexOrThrow(Telephony.Sms.BODY)
-                val dateIdx = c.getColumnIndexOrThrow(Telephony.Sms.DATE)
-                val typeIdx = c.getColumnIndexOrThrow(Telephony.Sms.TYPE)
-                val readIdx = c.getColumnIndexOrThrow(Telephony.Sms.READ)
-
-                do {
-                    val address = c.getString(addressIdx) ?: ""
-                    val body = c.getString(bodyIdx) ?: ""
-                    val date = c.getLong(dateIdx)
-                    val type = c.getInt(typeIdx)
-                    val isRead = c.getInt(readIdx) == 1
-
-                    Log.d(
-                        "SMS",
-                        "address=$address | type=$type | read=$isRead | body=$body"
+                messagesToInsert.add(
+                    Message(
+                        address = address,
+                        contactName = null,
+                        body = body,
+                        date = date,
+                        type = type,
+                        isScam = false,
+                        isSentByUser = type == Telephony.Sms.MESSAGE_TYPE_SENT,
+                        isRead = isRead
                     )
-
-                    messagesToInsert.add(
-                        Message(
-                            address = address,
-                            contactName = null,
-                            body = body,
-                            date = date,
-                            type = type,
-                            isScam = false,
-                            isSentByUser = (type == Telephony.Sms.MESSAGE_TYPE_SENT),
-                            isRead = isRead
-                        )
-                    )
-
-                } while (c.moveToNext())
-            }
-
-            if (messagesToInsert.isNotEmpty()) {
-                Log.d(
-                    "MessageRepository",
-                    "Inserting ${messagesToInsert.size} messages into DB"
                 )
-                messageDao.insertMessages(messagesToInsert)
-            } else {
-                Log.d("MessageRepository", "No messages found")
             }
+        }
 
-        } catch (e: Exception) {
-            Log.e("MessageRepository", "Error syncing SMS messages", e)
+        if (messagesToInsert.isNotEmpty()) {
+            messageDao.insertMessages(messagesToInsert)
+
+            prefs.edit().putLong("last_sms_date", newestDate).apply()
+
+            Log.d(
+                "MessageRepository",
+                "Inserted ${messagesToInsert.size} new messages"
+            )
         }
     }
+    suspend fun insertIncomingSms(
+        address: String,
+        body: String,
+        timestamp: Long
+    ) = withContext(Dispatchers.IO) {
+        val message = Message(
+            address = address,
+            contactName = null,
+            body = body,
+            date = timestamp,
+            type = Telephony.Sms.MESSAGE_TYPE_INBOX,
+            isScam = false,
+            isSentByUser = false,
+            isRead = false
+        )
+
+        messageDao.insertMessage(message)
+
+        Log.d("MessageRepository", "Inserted incoming SMS from $address")
+    }
+
+
+
 
     fun getMessagesByAddress(address: String): Flow<List<Message>> {
         return messageDao.getMessagesByAddress(address)
@@ -126,4 +152,14 @@ class MessageRepository(context: Context) {
     suspend fun markMessageAsRead(address: String) {
         messageDao.markMessageAsRead(address)
     }
+
+    suspend fun deleteMessagesByAddress(address: String) {
+        messageDao.deleteMessagesByAddress(address)
+        Log.d("MessageRepository", "Deleted messages of $address")
+    }
+
+    suspend fun deleteMessageById(messageId: Long) {
+        messageDao.deleteMessageById(messageId)
+    }
+
 }

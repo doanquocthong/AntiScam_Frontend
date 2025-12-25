@@ -7,16 +7,25 @@ import com.example.antiscam.data.repository.MessageRepository
 import com.example.antiscam.data.repository.ScamCheckRepository
 
 object ServiceLocator {
-    private lateinit var appContext: Context
-    fun init(context: Context) {
-        appContext = context.applicationContext
-    }
+
+    private var appContext: Context? = null
 
     val callLogRepository: CallLogRepository by lazy {
-        CallLogRepository(appContext)
+        requireNotNull(appContext) {
+            "ServiceLocator.init(context) must be called before using repositories"
+        }
+        CallLogRepository(appContext!!)
     }
 
     val messageRepository: MessageRepository by lazy {
-        MessageRepository(appContext)
+        requireNotNull(appContext) {
+            "ServiceLocator.init(context) must be called before using repositories"
+        }
+        MessageRepository(appContext!!)
+    }
+
+    fun init(context: Context) {
+        appContext = context.applicationContext
     }
 }
+

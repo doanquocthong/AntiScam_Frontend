@@ -11,60 +11,57 @@ import com.example.antiscam.data.model.CallLog
 import kotlinx.coroutines.flow.Flow
 import kotlin.math.absoluteValue
 
-//CẦN LÀM: 1. Chỉ đọc callLog 1 lần duy nhất khi tải app, khi có cuộc gọi đến thì lưu vào database
-class CallLogRepository(context: Context) {
-    
-    // Khởi tạo database ngay lập tức để đảm bảo sẵn sàng
-    private val database: AppDatabase = try {
-        AppDatabase.getDatabase(context)
-    } catch (e: Exception) {
-        android.util.Log.e("CallLogRepository", "Error initializing database", e)
-        throw e
-    }
-    
-    private val callLogDao: CallLogDao = try {
-        database.callLogDao()
-    } catch (e: Exception) {
-        android.util.Log.e("CallLogRepository", "Error getting CallLogDao", e)
-        throw e
-    }
-    
-    fun getAllCallLogs(): Flow<List<CallLog>> {
-        return callLogDao.getAllCallLogs()
-    }
-    
-    fun getCallLogsByPhoneNumber(phoneNumber: String): Flow<List<CallLog>> {
-        return callLogDao.getCallLogsByPhoneNumber(phoneNumber)
-    }
+/**
+ * Repository chỉ nhận APPLICATION CONTEXT
+ * ❌ Không nhận Activity / Compose context
+ */
+class CallLogRepository(
+    private val appContext: Context
+) {
+
+    // Luôn dùng applicationContext để tránh leak
+    private val database: AppDatabase = AppDatabase.getDatabase(appContext)
+    private val callLogDao: CallLogDao = database.callLogDao()
+
+    /* ------------------ QUERY ------------------ */
+
+    fun getAllCallLogs(): Flow<List<CallLog>> =
+        callLogDao.getAllCallLogs()
+
+    fun getCallLogsByPhoneNumber(phoneNumber: String): Flow<List<CallLog>> =
+        callLogDao.getCallLogsByPhoneNumber(phoneNumber)
+
+    /* ------------------ INSERT / UPDATE ------------------ */
 
     suspend fun insertCallLog(callLog: CallLog) {
-        try {
-            callLogDao.insertCallLog(callLog)
-            android.util.Log.d("CallLogRepository", "CallLog inserted successfully: ${callLog.phoneNumber}")
-        } catch (e: Exception) {
-            android.util.Log.e("CallLogRepository", "Error inserting CallLog: ${callLog.phoneNumber}", e)
-            throw e
-        }
+        callLogDao.insertCallLog(callLog)
     }
-    
+
     suspend fun insertCallLogs(callLogs: List<CallLog>) {
         callLogDao.insertCallLogs(callLogs)
     }
-    
+
     suspend fun deleteCallLog(id: Int) {
         callLogDao.deleteCallLog(id)
     }
-    
+
     suspend fun deleteAllCallLogs() {
         callLogDao.deleteAllCallLogs()
     }
-    
+
+    suspend fun updateContactName(phoneNumber: String, name: String) {
+        callLogDao.updateContactNameByPhone(phoneNumber, name)
+    }
+
+    /* ------------------ SYNC SYSTEM CALL LOG ------------------ */
+
     /**
      * Đọc CallLog từ hệ thống và sync vào database
+     * ⚠️ Chỉ gọi khi đã có READ_CALL_LOG
      */
-    suspend fun syncFromSystemCallLog(context: Context) {
+    suspend fun syncFromSystemCallLog() {
         if (ContextCompat.checkSelfPermission(
-                context,
+                appContext,
                 Manifest.permission.READ_CALL_LOG
             ) != PackageManager.PERMISSION_GRANTED
         ) {
@@ -72,10 +69,8 @@ class CallLogRepository(context: Context) {
         }
 
         try {
-//            // Xóa hết lịch sử cũ trước khi đồng bộ
-//            callLogDao.deleteAllCallLogs()
+            val resolver = appContext.contentResolver
 
-            val resolver = context.contentResolver
             val cursor = resolver.query(
                 SystemCallLog.Calls.CONTENT_URI,
                 arrayOf(
@@ -123,32 +118,37 @@ class CallLogRepository(context: Context) {
                         else -> "OUTGOING"
                     }
 
-                    val colorIndex = number.hashCode().absoluteValue % colors.size
-                    val avatarColor = colors[colorIndex].toInt()
+                    val avatarColor = colors[
+                        number.hashCode().absoluteValue % colors.size
+                    ].toInt()
 
-                    val callLog = CallLog(
-                        phoneNumber = number,
-                        contactName = name,
-                        callType = callType,
-                        timestamp = date,
-                        duration = duration,
-                        isScam = false,
-                        avatarColor = avatarColor
+                    callLogsToInsert.add(
+                        CallLog(
+                            phoneNumber = number,
+                            contactName = name,
+                            callType = callType,
+                            timestamp = date,
+                            duration = duration,
+                            isScam = false,
+                            avatarColor = avatarColor
+                        )
                     )
-
-                    callLogsToInsert.add(callLog)
                 }
 
                 if (callLogsToInsert.isNotEmpty()) {
                     callLogDao.insertCallLogs(callLogsToInsert)
-                    android.util.Log.d("CallLogRepository", "Synced ${callLogsToInsert.size} call logs from system")
                 }
             }
         } catch (e: Exception) {
-            android.util.Log.e("CallLogRepository", "Error syncing from system call log", e)
+            android.util.Log.e(
+                "CallLogRepository",
+                "Error syncing system call log",
+                e
+            )
         }
     }
 
+    /* ------------------ INSERT REAL-TIME SYSTEM CALL ------------------ */
 
     suspend fun insertFromSystem(
         phoneNumber: String,
@@ -177,14 +177,10 @@ class CallLogRepository(context: Context) {
         val avatarColor = colors[
             phoneNumber.hashCode().absoluteValue % colors.size
         ].toInt()
-        android.util.Log.d(
-            "CallLogRepository",
-            "isScam = $isScam",
 
-        )
         val callLog = CallLog(
             phoneNumber = phoneNumber,
-            contactName = null,          // system chưa resolve
+            contactName = null,
             callType = callTypeStr,
             timestamp = timestamp,
             duration = duration.toInt(),
@@ -192,19 +188,6 @@ class CallLogRepository(context: Context) {
             avatarColor = avatarColor
         )
 
-        try {
-            callLogDao.insertCallLog(callLog)
-            android.util.Log.d(
-                "CallLogRepository",
-                "Inserted new system call: $phoneNumber - $callTypeStr"
-            )
-        } catch (e: Exception) {
-            android.util.Log.e(
-                "CallLogRepository",
-                "Duplicate or error inserting system call",
-                e
-            )
-        }
+        callLogDao.insertCallLog(callLog)
     }
 }
-

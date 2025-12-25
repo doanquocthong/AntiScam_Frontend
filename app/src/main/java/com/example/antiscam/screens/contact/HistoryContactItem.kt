@@ -4,7 +4,9 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
@@ -17,6 +19,8 @@ import androidx.compose.material.icons.filled.CallReceived
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Message
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Report
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
@@ -49,7 +53,8 @@ fun HistoryContactItem(
     reportUiState: ReportUiState,
     openCallLogDetail:(String) -> Unit,
     onReportClick: (ReportRequest) -> Unit = {},
-    onDelete: (GroupedCallLog) -> Unit // 👈 THÊM
+    onDelete: (GroupedCallLog) -> Unit, // 👈 THÊM
+    onAddContactClick: (GroupedCallLog) -> Unit,
 ) {
     // Sử dụng màu đã lưu trong groupedCallLog
     val avatarColor = remember(groupedCallLog.avatarColor) {
@@ -107,11 +112,12 @@ fun HistoryContactItem(
         ?.takeIf { it.isLetter() }
         ?.uppercase()
         ?: "?"
+    val isNotInContacts = groupedCallLog.contactName.isNullOrBlank()
 
     val reporterPhone = reporterPhone
     Log.d("reporterPhone", "= $reporterPhone")
-
     var showReportDialog by remember { mutableStateOf(false) }
+
     LaunchedEffect(
         reportUiState.isSuccess,
         reportUiState.errorMessage
@@ -198,20 +204,51 @@ fun HistoryContactItem(
                     }
                 } else {
                     Log.d("groupedCallLog.phone", "= ${groupedCallLog.phoneNumber}")
-                    Box(
-                        modifier = Modifier
-                            .size(45.dp)
-                            .clip(CircleShape)
-                            .background(avatarColor),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = firstChar,
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp
-                        )
+                    if (isNotInContacts) {
+                        // 👤❓ Chưa có trong danh bạ
+                        Surface(
+                            modifier = Modifier.size(45.dp),
+                            shape = CircleShape,
+                            color = Color.Black,
+                            border = BorderStroke(1.dp, Color(0xFFCBBCBC))
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxSize(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Person,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Text(
+                                    text = "?",
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 18.sp
+                                )
+                            }
+                        }
+
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size(45.dp)
+                                .clip(CircleShape)
+                                .background(avatarColor),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = firstChar,
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 18.sp
+                            )
+                        }
                     }
+
                 }
                 Spacer(modifier = Modifier.width(12.dp))
 
@@ -294,7 +331,6 @@ fun HistoryContactItem(
                         modifier = Modifier
                             .size(26.dp)
                             .clickable {
-                                // TODO: gọi callback xóa
                                 isSelected = false
                             }
                     )
@@ -310,14 +346,20 @@ fun HistoryContactItem(
 
                     Spacer(modifier = Modifier.width(10.dp))
 
-                    Icon(
-                        imageVector = Icons.Default.Report,
-                        contentDescription = "Báo cáo",
-                        tint = Color(0xFFA6382D),
-                        modifier = Modifier
-                            .size(26.dp)
-                            .clickable { showReportDialog = true }
-                    )
+
+                    if (isNotInContacts) {
+                        Spacer(modifier = Modifier.width(10.dp))
+
+                        Icon(
+                            imageVector = Icons.Default.Report,
+                            contentDescription = "Báo cáo",
+                            tint = Color(0xFFA6382D),
+                            modifier = Modifier
+                                .size(26.dp)
+                                .clickable { showReportDialog = true }
+                        )
+                    }
+
                 }
 
                 if (showReportDialog) {
@@ -333,6 +375,7 @@ fun HistoryContactItem(
                     )
                 }
             }
+
             AnimatedVisibility(visible = expanded) {
                 Column(
                     modifier = Modifier
@@ -340,6 +383,11 @@ fun HistoryContactItem(
                         .background(Color(0xFF2C2C2E), shape = MaterialTheme.shapes.medium)
                         .clip(MaterialTheme.shapes.medium)
                 ) {
+                    //Nếu số không nằm trong danh bạ hiện thêm danh bạ
+                    if (isNotInContacts) {
+                        ActionItem(Icons.Default.PersonAdd, "Thêm số vào danh bạ", {onAddContactClick(groupedCallLog) })
+                        Divider(color = Color.Black.copy(alpha = 0.3f))
+                    }
                     ActionItem(Icons.Default.Message, "Tin nhắn", {})
                     Divider(color = Color.Black.copy(alpha = 0.3f))
                     ActionItem(Icons.Default.History, "Nhật ký", {openCallLogDetail(groupedCallLog.phoneNumber)})

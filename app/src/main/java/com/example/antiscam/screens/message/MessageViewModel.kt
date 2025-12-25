@@ -1,14 +1,17 @@
 package com.example.antiscam.screens.message
 
+import android.provider.Telephony
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.antiscam.data.model.Message
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import com.example.antiscam.data.repository.MessageRepository
+import kotlinx.coroutines.flow.distinctUntilChanged
 
 private const val TAG = "MessageViewModel"
 
@@ -33,8 +36,10 @@ class MessageViewModel(
     private fun observeMessages() {
         viewModelScope.launch {
             Log.d(TAG, "Start collecting messages")
-
-            messageRepository.getAllMessages().collect { msgs ->
+            messageRepository
+                .getAllMessages()
+                .distinctUntilChanged()
+                .collect { msgs ->
                 Log.d(TAG, "Collected messages: ${msgs.size}")
 
                 // Log thử 3 tin đầu
@@ -86,35 +91,70 @@ class MessageViewModel(
         }
     }
 
-//    fun syncMessagesFromSystem(context: android.content.Context) {
-//        viewModelScope.launch {
-//            Log.d(TAG, "syncMessagesFromSystem() START")
-//
-//            _uiState.update {
-//                Log.d(TAG, "UI → isSyncing = true")
-//                it.copy(isSyncing = true, errorMessage = null)
-//            }
-//
-//            try {
-//                messageRepository.syncFromSystemMessages(context)
-//                Log.d(TAG, "syncMessagesFromSystem() SUCCESS")
-//
-//                _uiState.update {
-//                    Log.d(TAG, "UI → isSyncing = false")
-//                    it.copy(isSyncing = false)
-//                }
-//            } catch (e: Exception) {
-//                Log.e(TAG, "syncMessagesFromSystem() ERROR", e)
-//
-//                _uiState.update {
-//                    it.copy(
-//                        isSyncing = false,
-//                        errorMessage = "Lỗi đồng bộ tin nhắn"
-//                    )
-//                }
-//            }
-//        }
-//    }
+
+    fun syncMessagesFromSystem() {
+        viewModelScope.launch {
+            Log.d(TAG, "syncMessagesFromSystem() START")
+
+            _uiState.update {
+                it.copy(isSyncing = true, errorMessage = null)
+            }
+
+            try {
+                messageRepository.syncFromSystemMessages()
+                Log.d(TAG, "syncMessagesFromSystem() SUCCESS")
+            } catch (e: Exception) {
+                Log.e(TAG, "syncMessagesFromSystem() ERROR", e)
+
+                _uiState.update {
+                    it.copy(errorMessage = "Lỗi đồng bộ tin nhắn")
+                }
+            } finally {
+                _uiState.update {
+                    it.copy(isSyncing = false)
+                }
+            }
+        }
+    }
+
+    fun addMessage(
+        address: String,
+        body: String,
+        timestamp: Long = System.currentTimeMillis(),
+        isSentByUser: Boolean = false
+    ) {
+        viewModelScope.launch {
+            try {
+                if (isSentByUser) {
+                    messageRepository.insertMessages(
+                        listOf(
+                            Message(
+                                address = address,
+                                contactName = null,
+                                body = body,
+                                date = timestamp,
+                                type = Telephony.Sms.MESSAGE_TYPE_SENT,
+                                isScam = false,
+                                isSentByUser = true,
+                                isRead = true
+                            )
+                        )
+                    )
+                } else {
+                    messageRepository.insertIncomingSms(
+                        address = address,
+                        body = body,
+                        timestamp = timestamp
+                    )
+                }
+
+                Log.d(TAG, "addMessage SUCCESS → $address")
+
+            } catch (e: Exception) {
+                Log.e(TAG, "addMessage ERROR", e)
+            }
+        }
+    }
 
 
 }

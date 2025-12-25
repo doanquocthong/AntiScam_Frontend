@@ -13,6 +13,7 @@ import com.example.antiscam.data.model.enums.ContactTab
 import com.example.antiscam.data.repository.CallLogRepository
 import com.example.antiscam.data.repository.ContactRepository
 import com.example.antiscam.data.repository.ScamCheckRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -79,6 +80,35 @@ class ContactScreenViewModel(
             } catch (_: Exception) {}
         }
     }
+    fun addContactToPhoneBook(
+        name: String,
+        phoneNumber: String
+    ) {
+        viewModelScope.launch {
+            val success = runCatching {
+                contactRepository.addContact(
+                    name = name,
+                    phoneNumber = phoneNumber
+                )
+            }.getOrElse { false }
+
+            if (success) {
+                // 🔥 UPDATE ROOM
+                callLogRepository.updateContactName(phoneNumber, name)
+                _effects.emit(ContactEffect.ShowToast("Đã thêm vào danh bạ"))
+                _effects.emit(ContactEffect.ContactAddedSuccess)
+
+                // Reload lại danh bạ để UI cập nhật
+                loadContacts()
+            } else {
+                _effects.emit(
+                    ContactEffect.ContactAddFailed(
+                        "Không thể thêm liên hệ. Vui lòng kiểm tra quyền truy cập."
+                    )
+                )
+            }
+        }
+    }
 
     fun deleteCallLog(id: Int) {
         Log.d("CallLogViewModel", "deleteCallLog() called with id=$id")
@@ -104,14 +134,13 @@ class ContactScreenViewModel(
 //
 //    Sau khi bạn đã sync trong MyApp.onCreate(),
 //    thì trong ViewModel không được phép làm:
-//    fun syncCallLogs(context: Context) {
-//        viewModelScope.launch {
-//            _uiState.update { it.copy(isSyncingCallLogs = true) }
-//            runCatching { callLogRepository.syncFromSystemCallLog(context) }
-//                .onFailure { _effects.emit(ContactEffect.ShowToast("Không thể đồng bộ lịch sử cuộc gọi")) }
-//            _uiState.update { it.copy(isSyncingCallLogs = false) }
-//        }
-//    }
+    fun syncCallLogs(onDone: () -> Unit) {
+    viewModelScope.launch(Dispatchers.IO) {
+        callLogRepository.syncFromSystemCallLog()
+        onDone()
+    }
+    }
+
 
     fun requestCall(phoneNumber: String, contactName: String?) {
         if (_uiState.value.isCheckingScam) return
@@ -247,6 +276,9 @@ class ContactScreenViewModelFactory(
 sealed interface ContactEffect {
     data class StartCall(val phoneNumber: String) : ContactEffect
     data class ShowToast(val message: String) : ContactEffect
+
+    object ContactAddedSuccess : ContactEffect
+    data class ContactAddFailed(val reason: String) : ContactEffect
 }
 
 private fun List<GroupedCallLog>.filter(query: String, selector: (GroupedCallLog) -> String): List<GroupedCallLog> {

@@ -1,6 +1,15 @@
 package com.example.antiscam.screens.message
 
 import MessageItem
+import android.Manifest
+import android.app.Activity
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.provider.Telephony
+import android.util.Log
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -16,6 +25,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import androidx.core.content.ContextCompat.getSystemService
+import androidx.core.content.edit
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.antiscam.data.repository.MessageRepository
 import com.example.antiscam.screens.contact.FilterChip
@@ -25,40 +37,133 @@ import com.example.antiscam.screens.contact.FilterChip
 fun MessageScreen(
     onOpenMessageDetail: (String) -> Unit
 ) {
-
-    // ---------- ViewModel ----------
+    // ----------------------------------------------------
+    // Context / Activity
+    // ----------------------------------------------------
     val context = LocalContext.current
-    val messageRepository = remember { MessageRepository(context) }
+    val activity = context as Activity
+
+    // ----------------------------------------------------
+    // ViewModel
+    // ----------------------------------------------------
+    val messageRepository = remember {
+        MessageRepository(context.applicationContext)
+    }
 
     val viewModel: MessageViewModel = viewModel(
         factory = object : androidx.lifecycle.ViewModelProvider.Factory {
             override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
-                if (modelClass.isAssignableFrom(MessageViewModel::class.java)) {
-                    @Suppress("UNCHECKED_CAST")
-                    return MessageViewModel(messageRepository) as T
-                }
-                throw IllegalArgumentException("Unknown ViewModel class")
+                return MessageViewModel(messageRepository) as T
             }
         }
     )
 
     val uiState by viewModel.uiState.collectAsState()
 
-    // ---------- Sync once ----------
-//    LaunchedEffect(Unit) {
-//        viewModel.syncMessagesFromSystem(context)
-//    }
+    // ----------------------------------------------------
+    // READ_SMS permission
+    // ----------------------------------------------------
+    var hasSmsPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.READ_SMS
+            ) == PackageManager.PERMISSION_GRANTED
+        )
+    }
 
-    // ---------- UI ----------
+    val smsPermissionLauncher =
+        rememberLauncherForActivityResult(
+            ActivityResultContracts.RequestPermission()
+        ) { granted ->
+            hasSmsPermission = granted
+        }
+
+    // ----------------------------------------------------
+    // Default SMS App
+    // ----------------------------------------------------
+    var isDefaultSmsApp by remember {
+        mutableStateOf(
+            Telephony.Sms.getDefaultSmsPackage(context) ==
+                    context.packageName
+        )
+    }
+
+    val defaultSmsLauncher =
+        rememberLauncherForActivityResult(
+            ActivityResultContracts.StartActivityForResult()
+        ) {
+            isDefaultSmsApp =
+                Telephony.Sms.getDefaultSmsPackage(context) ==
+                        context.packageName
+        }
+
+    fun requestDefaultSmsApp() {
+        val intent = Intent(Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT)
+        intent.putExtra(
+            Telephony.Sms.Intents.EXTRA_PACKAGE_NAME,
+            context.packageName
+        )
+        defaultSmsLauncher.launch(intent)
+    }
+
+    // ----------------------------------------------------
+    // First-time sync flag
+    // ----------------------------------------------------
+    val prefs = remember {
+        context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+    }
+
+    var firstSmsSyncDone by remember {
+        mutableStateOf(
+            prefs.getBoolean("first_sms_sync_done", false)
+        )
+    }
+
+
+    // ----------------------------------------------------
+    // Request permission when screen opens
+    // ----------------------------------------------------
+    LaunchedEffect(Unit) {
+        if (!hasSmsPermission) {
+            smsPermissionLauncher.launch(Manifest.permission.READ_SMS)
+        }
+    }
+
+    // ----------------------------------------------------
+    // Sync SMS ONLY ONCE
+    // ----------------------------------------------------
+    LaunchedEffect(hasSmsPermission, isDefaultSmsApp) {
+        if (
+            hasSmsPermission &&
+            isDefaultSmsApp &&
+            !firstSmsSyncDone
+        ) {
+            viewModel.syncMessagesFromSystem()
+
+            prefs.edit {
+                putBoolean("first_sms_sync_done", true)
+            }
+
+            firstSmsSyncDone = true
+        }
+    }
+    // ----------------------------------------------------
+    // UI
+    // ----------------------------------------------------
     Scaffold(
         containerColor = Color.Black,
         topBar = {
             Column(
                 modifier = Modifier
                     .background(Color(0xFF1C1C1E))
-                    .padding(top = 20.dp, start = 12.dp, end = 12.dp, bottom = 8.dp)
+                    .padding(
+                        top = 20.dp,
+                        start = 12.dp,
+                        end = 12.dp,
+                        bottom = 8.dp
+                    )
             ) {
-
                 // Search bar
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -94,7 +199,6 @@ fun MessageScreen(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Filters (UI only, chưa xử lý logic)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(text = "Đã đọc", selected = true, onClick = {})
                     FilterChip(text = "Chưa đọc", selected = false, onClick = {})
@@ -102,19 +206,51 @@ fun MessageScreen(
             }
         }
     ) { paddingValues ->
-
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-
-            // Loading
-            if (uiState.isSyncing) {
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            // ------------------------------------------------
+            // Banner yêu cầu Default SMS App
+            // ------------------------------------------------
+            if (!isDefaultSmsApp) {
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color(0xFF2C2C2E)
+                    ),
+                    modifier = Modifier
+                        .padding(12.dp)
+                        .fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Cần đặt ứng dụng làm SMS mặc định để nhận & phân tích tin nhắn lừa đảo",
+                            color = Color.White,
+                            modifier = Modifier.weight(1f)
+                        )
+                        TextButton(onClick = { requestDefaultSmsApp() }) {
+                            Text("Đặt ngay")
+                        }
+                    }
+                }
             }
 
+            // ------------------------------------------------
+            // Loading
+            // ------------------------------------------------
+            if (uiState.isSyncing) {
+                LinearProgressIndicator(
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            // ------------------------------------------------
             // Empty state
+            // ------------------------------------------------
             if (uiState.conversations.isEmpty() && !uiState.isSyncing) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
@@ -124,7 +260,9 @@ fun MessageScreen(
                 }
             }
 
-            // List
+            // ------------------------------------------------
+            // Message list
+            // ------------------------------------------------
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
@@ -148,3 +286,4 @@ fun MessageScreen(
         }
     }
 }
+
