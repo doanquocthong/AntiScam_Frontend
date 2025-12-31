@@ -65,18 +65,17 @@ fun MessageScreen(
     // ----------------------------------------------------
     var hasSmsPermission by remember {
         mutableStateOf(
-            ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.READ_SMS
-            ) == PackageManager.PERMISSION_GRANTED
+            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED &&
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED
         )
     }
 
     val smsPermissionLauncher =
         rememberLauncherForActivityResult(
-            ActivityResultContracts.RequestPermission()
-        ) { granted ->
-            hasSmsPermission = granted
+            ActivityResultContracts.RequestMultiplePermissions()
+        ) { permissions ->
+            hasSmsPermission = permissions[Manifest.permission.READ_SMS] == true &&
+                    permissions[Manifest.permission.RECEIVE_SMS] == true
         }
 
     // ----------------------------------------------------
@@ -124,19 +123,19 @@ fun MessageScreen(
     // ----------------------------------------------------
     // Request permission when screen opens
     // ----------------------------------------------------
+    // Request permissions when screen opens
     LaunchedEffect(Unit) {
         if (!hasSmsPermission) {
-            smsPermissionLauncher.launch(Manifest.permission.READ_SMS)
+            smsPermissionLauncher.launch(arrayOf(Manifest.permission.READ_SMS, Manifest.permission.RECEIVE_SMS))
         }
     }
 
     // ----------------------------------------------------
     // Sync SMS ONLY ONCE
     // ----------------------------------------------------
-    LaunchedEffect(hasSmsPermission, isDefaultSmsApp) {
+    LaunchedEffect(hasSmsPermission) {
         if (
             hasSmsPermission &&
-            isDefaultSmsApp &&
             !firstSmsSyncDone
         ) {
             viewModel.syncMessagesFromSystem()
@@ -214,7 +213,7 @@ fun MessageScreen(
             // ------------------------------------------------
             // Banner yêu cầu Default SMS App
             // ------------------------------------------------
-            if (!isDefaultSmsApp) {
+            if (isDefaultSmsApp) {
                 Card(
                     colors = CardDefaults.cardColors(
                         containerColor = Color(0xFF2C2C2E)
@@ -277,6 +276,8 @@ fun MessageScreen(
                         latestTime = conversation.lastTimestamp,
                         isRead = conversation.isRead,
                         unReadCount = conversation.unReadCount,
+                        isScamNumber = conversation.isScamNumber,
+                        isScamMessage = conversation.isScamMessage,
                         openMessageDetail = {
                             onOpenMessageDetail(conversation.address)
                         }

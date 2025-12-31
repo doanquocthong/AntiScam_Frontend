@@ -5,7 +5,8 @@ data class GroupedMessage(
     val lastMessage: String,
     val lastTimestamp: Long,
     val messageCount: Int,
-    val isScam: Boolean,
+    val isScamMessage: Boolean,
+    val isScamNumber: Boolean,
     val isSentByUser: Boolean,
     val unReadCount: Int,
     val isRead: Boolean

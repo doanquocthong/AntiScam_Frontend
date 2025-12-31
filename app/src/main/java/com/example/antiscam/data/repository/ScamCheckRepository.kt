@@ -2,6 +2,7 @@ package com.example.antiscam.data.repository
 
 import android.util.Log
 import com.example.antiscam.data.model.request.ReportRequest
+import com.example.antiscam.data.model.request.ScamPredictRequest
 import com.example.antiscam.data.model.response.ApiResponse
 import com.example.antiscam.data.model.response.MessageResponse
 import com.example.antiscam.data.model.response.ReportResponse
@@ -17,22 +18,27 @@ class ScamCheckRepository(
     suspend fun checkPhoneNumber(phoneNumber: String): ApiResponse<ScamCheckResponse>? {
         return withContext(Dispatchers.IO) {
             try {
-                apiService.checkPhone(phoneNumber)
+                val response = apiService.checkPhone(phoneNumber)
+                Log.d("ScamCheckRepository", "Success checking scam number, response = $response")
+                response
             } catch (e: Exception) {
                 Log.e("ScamCheckRepository", "Error checking scam number", e)
                 null
             }
         }
     }
-    suspend fun checkMessage(message: String): ApiResponse<MessageResponse>? {
+    suspend fun checkMessage(request: ScamPredictRequest): ApiResponse<MessageResponse>? {
         return withContext(Dispatchers.IO) {
             try {
-                apiService.checkMessage(message)
+                val response = apiService.checkMessage(request)
+                Log.d("ScamCheckRepository", "Check message success, response = $response")
+                response
             } catch (e: Exception) {
-                Log.e("ScamCheckRepository", "Error checking scam message   ", e)
+                Log.e("ScamCheckRepository", "Error checking scam message", e)
                 null
             }
         }
     }
+
 }
 

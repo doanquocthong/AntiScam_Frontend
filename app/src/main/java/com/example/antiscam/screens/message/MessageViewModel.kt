@@ -71,7 +71,8 @@ class MessageViewModel(
                             lastMessage = latest.body,
                             lastTimestamp = latest.date,
                             messageCount = messages.size,
-                            isScam = messages.any { it.isScam },
+                            isScamMessage = messages.any { it.isScamMessage == true },
+                            isScamNumber = messages.any { it.isScamNumber == true },
                             isRead = latest.isRead,
                             unReadCount = messages.count {
                                 !it.isRead && !it.isSentByUser
@@ -117,44 +118,46 @@ class MessageViewModel(
         }
     }
 
-    fun addMessage(
-        address: String,
-        body: String,
-        timestamp: Long = System.currentTimeMillis(),
-        isSentByUser: Boolean = false
-    ) {
-        viewModelScope.launch {
-            try {
-                if (isSentByUser) {
-                    messageRepository.insertMessages(
-                        listOf(
-                            Message(
-                                address = address,
-                                contactName = null,
-                                body = body,
-                                date = timestamp,
-                                type = Telephony.Sms.MESSAGE_TYPE_SENT,
-                                isScam = false,
-                                isSentByUser = true,
-                                isRead = true
-                            )
-                        )
-                    )
-                } else {
-                    messageRepository.insertIncomingSms(
-                        address = address,
-                        body = body,
-                        timestamp = timestamp
-                    )
-                }
-
-                Log.d(TAG, "addMessage SUCCESS → $address")
-
-            } catch (e: Exception) {
-                Log.e(TAG, "addMessage ERROR", e)
-            }
-        }
-    }
-
-
+//    fun addMessage(
+//        address: String,
+//        body: String,
+//        timestamp: Long = System.currentTimeMillis(),
+//        isSentByUser: Boolean = false
+//    ) {
+//        viewModelScope.launch {
+//            try {
+//                if (isSentByUser) {
+//                    messageRepository.insertMessages(
+//                        listOf(
+//                            Message(
+//                                address = address,
+//                                contactName = null,
+//                                body = body,
+//                                date = timestamp,
+//                                type = Telephony.Sms.MESSAGE_TYPE_SENT,
+//                                isScam = false,
+//                                isSentByUser = true,
+//                                isRead = true,
+//                                id = TODO(),
+//                                systemSmsId = TODO()
+//                            )
+//                        )
+//                    )
+//                } else {
+//                    messageRepository.insertIncomingSms(
+//                        address = address,
+//                        body = body,
+//                        timestamp = timestamp,
+//                        systemSmsId = TODO(),
+//                        isRead = TODO()
+//                    )
+//                }
+//
+//                Log.d(TAG, "addMessage SUCCESS → $address")
+//
+//            } catch (e: Exception) {
+//                Log.e(TAG, "addMessage ERROR", e)
+//            }
+//        }
+//    }
 }

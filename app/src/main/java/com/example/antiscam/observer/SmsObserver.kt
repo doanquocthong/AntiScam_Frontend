@@ -6,6 +6,7 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.Telephony
 import android.util.Log
+import com.example.antiscam.data.repository.ScamCheckRepository
 import com.example.antiscam.di.ServiceLocator
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -39,6 +40,7 @@ class SmsObserver(
 
                 cursor?.use { c ->
                     if (!c.moveToFirst()) return@launch
+                    val systemId = c.getLong(c.getColumnIndexOrThrow(Telephony.Sms._ID))
 
                     val address =
                         c.getString(c.getColumnIndexOrThrow(Telephony.Sms.ADDRESS)) ?: return@launch
@@ -57,14 +59,14 @@ class SmsObserver(
                         TAG,
                         "Latest SMS → address=$address read=$isRead"
                     )
-
-                    // 🔥 Update DB local
+             // 🔥 Update DB local
                     ServiceLocator.messageRepository.insertIncomingSms(
+                        systemSmsId = systemId,
                         address = address,
                         body = body,
-                        timestamp = timestamp
+                        timestamp = timestamp,
+                        isRead = isRead
                     )
-
                 }
 
             } catch (e: Exception) {

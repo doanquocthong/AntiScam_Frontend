@@ -16,10 +16,16 @@ import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Backspace
+import androidx.compose.material.icons.filled.Backspace
+import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
@@ -28,8 +34,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -146,6 +154,8 @@ fun ContactScreen(
             prefs.getBoolean("first_calllog_sync_done", false)
         )
     }
+    var showDialPad by remember { mutableStateOf(false) }
+
 
 
     var hasCallLogPermission by remember {
@@ -314,302 +324,457 @@ fun ContactScreen(
             showAddContactDialog = false
             selectedCallLog = null
         }
-
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        containerColor = Color.Black,
-        snackbarHost = {
-            SnackbarHost(hostState = snackbarHostState) { data ->
-                Notification(
-                    message = data.visuals.message,
-                    type = notificationType
-                )
-            }
-        },
-        topBar = {
-            Column(
-                modifier = Modifier
-                    .background(Color(0xFF1C1C1E))
-                    .padding(top = 20.dp, start = 12.dp, end = 12.dp, bottom = 8.dp)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .clip(MaterialTheme.shapes.large)
-                        .background(Color(0xFF2C2C2E))
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp)
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            containerColor = Color.Black,
+            snackbarHost = {
+                SnackbarHost(hostState = snackbarHostState) { data ->
+                    Notification(
+                        message = data.visuals.message,
+                        type = notificationType
+                    )
+                }
+            },
+            floatingActionButton = {
+                FloatingActionButton(
+                    onClick = { showDialPad = true }
                 ) {
-                    TextField(
-                        value = uiState.searchQuery,
-                        onValueChange = viewModel::onSearchQueryChange,
-                        placeholder = { Text("Tìm người liên hệ", color = Color.Gray) },
-                        modifier = Modifier.weight(1f),
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent,
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent,
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
-                        ),
-                        singleLine = true
-                    )
-                    Icon(Icons.Default.Mic, contentDescription = null, tint = Color.Gray)
+                    Icon(Icons.Default.Call, null)
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(
-                        text = "Lịch sử",
-                        selected = uiState.selectedTab == ContactTab.CallHistory,
-                        onClick = { viewModel.onTabSelected(ContactTab.CallHistory) }
-                    )
-                    FilterChip(
-                        text = "Danh bạ",
-                        selected = uiState.selectedTab == ContactTab.Contacts,
-                        onClick = { viewModel.onTabSelected(ContactTab.Contacts) }
-                    )
-                }
-
-                if (uiState.isCheckingScam || uiState.isSyncingCallLogs) {
-                    LinearProgressIndicator(
+            },
+            topBar = {
+                Column(
+                    modifier = Modifier
+                        .background(Color(0xFF1C1C1E))
+                        .padding(top = 20.dp, start = 12.dp, end = 12.dp, bottom = 8.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
+                            .clip(MaterialTheme.shapes.large)
+                            .background(Color(0xFF2C2C2E))
                             .fillMaxWidth()
-                            .padding(top = 12.dp)
-                    )
-                }
-            }
-        }
-    ) { padding ->
-        Log.d("Default App", "Permission default App: = ${hasContactPermission}")
-        if (!hasContactPermission) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(text = "Ứng dụng cần quyền truy cập danh bạ", color = Color.White)
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .padding(padding)
-                    .background(Color(0xFF0D0D0D))
-            ) {
-//                if (isDefaultDialer) {
-//                    item {
-//                        Card(
-//                            colors = CardDefaults.cardColors(
-//                                containerColor = Color(0xFF2C2C2E)
-//                            ),
-//                            modifier = Modifier
-//                                .padding(12.dp)
-//                                .fillMaxWidth()
-//                        ) {
-//                            Row(
-//                                modifier = Modifier.padding(12.dp),
-//                                verticalAlignment = Alignment.CenterVertically
-//                            ) {
-//                                Icon(
-//                                    Icons.Default.Warning,
-//                                    contentDescription = null,
-//                                    tint = Color(0xFFFF9F0A)
-//                                )
-//                                Spacer(modifier = Modifier.width(8.dp))
-//                                Column(modifier = Modifier.weight(1f)) {
-//                                    Text(
-//                                        text = "Cần đặt làm ứng dụng gọi mặc định",
-//                                        color = Color.White,
-//                                        fontSize = 14.sp
-//                                    )
-//                                    Text(
-//                                        text = "Để phát hiện & cảnh báo cuộc gọi lừa đảo",
-//                                        color = Color.Gray,
-//                                        fontSize = 12.sp
-//                                    )
-//                                }
-//                                TextButton(onClick = { requestDefaultDialer() }) {
-//                                    Text("Đặt ngay")
-//                                }
-//                            }
-//                        }
-//                    }
-//                }
-                when (uiState.selectedTab) {
-                    ContactTab.CallHistory -> {
-                        if (uiState.filteredCallLogs.isEmpty()) {
-                            item { EmptyState("Chưa có lịch sử cuộc gọi") }
-                        } else {
-                            if (uiState.todayCallLogs.isNotEmpty()) {
-                                item {
-                                    Text(
-                                        "Hôm nay",
-                                        color = Color.Gray,
-                                        modifier = Modifier.padding(8.dp),
-                                        fontSize = 12.sp
-                                    )
-                                }
-                                items(uiState.todayCallLogs) { log ->
-                                    HistoryContactItem(
-                                        groupedCallLog = log,
-                                        openCallLogDetail = openCallLogDetail,
-                                        reporterPhone = reporterPhone,
-                                        onCallClick = {
-                                            handleCallRequest(
-                                                it.phoneNumber,
-                                                it.contactName
-                                            )
-                                        },
-                                        onReportClick = { request ->
-                                            reportViewModel.submitReport(request)
-                                            Log.d(
-                                                "Reported check",
-                                                "Clicked historyContactItem to report by ContactScreen, request = $request"
-                                            )
-                                        },
-                                        reportUiState = reportUiState,
-                                        onDelete = { log ->
-                                            viewModel.deleteCallLog(log.id)
-                                        },
-                                        onAddContactClick = {
-                                            selectedCallLog = it
-                                            showAddContactDialog = true
-                                        }
-                                    )
-                                }
-                            }
-
-                            if (uiState.yesterdayCallLogs.isNotEmpty()) {
-                                item {
-                                    Text(
-                                        "Hôm qua",
-                                        color = Color.Gray,
-                                        modifier = Modifier.padding(8.dp),
-                                        fontSize = 12.sp
-                                    )
-                                }
-                                items(uiState.yesterdayCallLogs) { log ->
-                                    HistoryContactItem(
-                                        groupedCallLog = log,
-                                        reporterPhone = reporterPhone,
-                                        openCallLogDetail = openCallLogDetail,
-                                        onCallClick = {
-                                            handleCallRequest(
-                                                it.phoneNumber,
-                                                it.contactName
-                                            )
-                                        },
-                                        onReportClick = { request ->
-                                            reportViewModel.submitReport(request)
-                                        },
-                                        reportUiState = reportUiState,
-                                        onDelete = { log ->
-                                            viewModel.deleteCallLog(log.id)
-                                        },
-                                        onAddContactClick = {
-                                            selectedCallLog = it
-                                            showAddContactDialog = true
-                                        }
-                                    )
-                                }
-                            }
-
-                            if (uiState.olderCallLogs.isNotEmpty()) {
-                                item {
-                                    Text(
-                                        "Cũ hơn",
-                                        color = Color.Gray,
-                                        modifier = Modifier.padding(8.dp),
-                                        fontSize = 12.sp
-                                    )
-                                }
-                                items(uiState.olderCallLogs) { log ->
-                                    HistoryContactItem(
-                                        groupedCallLog = log,
-                                        openCallLogDetail = openCallLogDetail,
-                                        reporterPhone = reporterPhone,
-                                        onCallClick = {
-                                            handleCallRequest(
-                                                it.phoneNumber,
-                                                it.contactName
-                                            )
-                                        },
-                                        onReportClick = { request ->
-                                            reportViewModel.submitReport(request)
-                                        },
-                                        reportUiState = reportUiState,
-                                        onDelete = { log ->
-                                            viewModel.deleteCallLog(log.id)
-                                        },
-                                        onAddContactClick = {
-                                            selectedCallLog = it
-                                            showAddContactDialog = true
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    ContactTab.Contacts -> {
-                        if (uiState.filteredContacts.isEmpty()) {
-                            item { EmptyState("Chưa có liên hệ") }
-                        } else {
-                            items(uiState.filteredContacts) { contact ->
-                                ContactItem(contact, openCallLogDetail) { selected ->
-                                    handleCallRequest(selected.phoneNumber, selected.name)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        if (showAddContactDialog && selectedCallLog != null) {
-            AddContactDialog(
-                phoneNumber = selectedCallLog!!.phoneNumber,
-                initialName = selectedCallLog!!.contactName,
-                onDismiss = {
-                    showAddContactDialog = false
-                    selectedCallLog = null
-                },
-                onConfirm = { name ->
-                    if (
-                        ContextCompat.checkSelfPermission(
-                            context,
-                            Manifest.permission.WRITE_CONTACTS
-                        ) == PackageManager.PERMISSION_GRANTED
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
                     ) {
-                        viewModel.addContactToPhoneBook(
-                            name = name,
-                            phoneNumber = selectedCallLog!!.phoneNumber
+                        TextField(
+                            value = uiState.searchQuery,
+                            onValueChange = viewModel::onSearchQueryChange,
+                            placeholder = { Text("Tìm người liên hệ", color = Color.Gray) },
+                            modifier = Modifier.weight(1f),
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent,
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White
+                            ),
+                            singleLine = true
                         )
+                        Icon(Icons.Default.Mic, contentDescription = null, tint = Color.Gray)
+                    }
 
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(
+                            text = "Lịch sử",
+                            selected = uiState.selectedTab == ContactTab.CallHistory,
+                            onClick = { viewModel.onTabSelected(ContactTab.CallHistory) }
+                        )
+                        FilterChip(
+                            text = "Danh bạ",
+                            selected = uiState.selectedTab == ContactTab.Contacts,
+                            onClick = { viewModel.onTabSelected(ContactTab.Contacts) }
+                        )
+                    }
+
+                    if (uiState.isCheckingScam || uiState.isSyncingCallLogs) {
+                        LinearProgressIndicator(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 12.dp)
+                        )
+                    }
+                }
+            }
+        ) { padding ->
+            Log.d("Default App", "Permission default App: = ${hasContactPermission}")
+            if (!hasContactPermission) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(text = "Ứng dụng cần quyền truy cập danh bạ", color = Color.White)
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .padding(padding)
+                        .background(Color(0xFF0D0D0D))
+                ) {
+                    //                if (isDefaultDialer) {
+                    //                    item {
+                    //                        Card(
+                    //                            colors = CardDefaults.cardColors(
+                    //                                containerColor = Color(0xFF2C2C2E)
+                    //                            ),
+                    //                            modifier = Modifier
+                    //                                .padding(12.dp)
+                    //                                .fillMaxWidth()
+                    //                        ) {
+                    //                            Row(
+                    //                                modifier = Modifier.padding(12.dp),
+                    //                                verticalAlignment = Alignment.CenterVertically
+                    //                            ) {
+                    //                                Icon(
+                    //                                    Icons.Default.Warning,
+                    //                                    contentDescription = null,
+                    //                                    tint = Color(0xFFFF9F0A)
+                    //                                )
+                    //                                Spacer(modifier = Modifier.width(8.dp))
+                    //                                Column(modifier = Modifier.weight(1f)) {
+                    //                                    Text(
+                    //                                        text = "Cần đặt làm ứng dụng gọi mặc định",
+                    //                                        color = Color.White,
+                    //                                        fontSize = 14.sp
+                    //                                    )
+                    //                                    Text(
+                    //                                        text = "Để phát hiện & cảnh báo cuộc gọi lừa đảo",
+                    //                                        color = Color.Gray,
+                    //                                        fontSize = 12.sp
+                    //                                    )
+                    //                                }
+                    //                                TextButton(onClick = { requestDefaultDialer() }) {
+                    //                                    Text("Đặt ngay")
+                    //                                }
+                    //                            }
+                    //                        }
+                    //                    }
+                    //                }
+                    when (uiState.selectedTab) {
+                        ContactTab.CallHistory -> {
+                            if (uiState.filteredCallLogs.isEmpty()) {
+                                item { EmptyState("Chưa có lịch sử cuộc gọi") }
+                            } else {
+                                if (uiState.todayCallLogs.isNotEmpty()) {
+                                    item {
+                                        Text(
+                                            "Hôm nay",
+                                            color = Color.Gray,
+                                            modifier = Modifier.padding(8.dp),
+                                            fontSize = 12.sp
+                                        )
+                                    }
+                                    items(uiState.todayCallLogs) { log ->
+                                        HistoryContactItem(
+                                            groupedCallLog = log,
+                                            openCallLogDetail = openCallLogDetail,
+                                            reporterPhone = reporterPhone,
+                                            onCallClick = {
+                                                handleCallRequest(
+                                                    it.phoneNumber,
+                                                    it.contactName
+                                                )
+                                            },
+                                            onReportClick = { request ->
+                                                reportViewModel.submitReport(request)
+                                                Log.d(
+                                                    "Reported check",
+                                                    "Clicked historyContactItem to report by ContactScreen, request = $request"
+                                                )
+                                            },
+                                            reportUiState = reportUiState,
+                                            onDelete = { log ->
+                                                viewModel.deleteCallLog(log.id)
+                                            },
+                                            onAddContactClick = {
+                                                selectedCallLog = it
+                                                showAddContactDialog = true
+                                            }
+                                        )
+                                    }
+                                }
+
+                                if (uiState.yesterdayCallLogs.isNotEmpty()) {
+                                    item {
+                                        Text(
+                                            "Hôm qua",
+                                            color = Color.Gray,
+                                            modifier = Modifier.padding(8.dp),
+                                            fontSize = 12.sp
+                                        )
+                                    }
+                                    items(uiState.yesterdayCallLogs) { log ->
+                                        HistoryContactItem(
+                                            groupedCallLog = log,
+                                            reporterPhone = reporterPhone,
+                                            openCallLogDetail = openCallLogDetail,
+                                            onCallClick = {
+                                                handleCallRequest(
+                                                    it.phoneNumber,
+                                                    it.contactName
+                                                )
+                                            },
+                                            onReportClick = { request ->
+                                                reportViewModel.submitReport(request)
+                                            },
+                                            reportUiState = reportUiState,
+                                            onDelete = { log ->
+                                                viewModel.deleteCallLog(log.id)
+                                            },
+                                            onAddContactClick = {
+                                                selectedCallLog = it
+                                                showAddContactDialog = true
+                                            }
+                                        )
+                                    }
+                                }
+
+                                if (uiState.olderCallLogs.isNotEmpty()) {
+                                    item {
+                                        Text(
+                                            "Cũ hơn",
+                                            color = Color.Gray,
+                                            modifier = Modifier.padding(8.dp),
+                                            fontSize = 12.sp
+                                        )
+                                    }
+                                    items(uiState.olderCallLogs) { log ->
+                                        HistoryContactItem(
+                                            groupedCallLog = log,
+                                            openCallLogDetail = openCallLogDetail,
+                                            reporterPhone = reporterPhone,
+                                            onCallClick = {
+                                                handleCallRequest(
+                                                    it.phoneNumber,
+                                                    it.contactName
+                                                )
+                                            },
+                                            onReportClick = { request ->
+                                                reportViewModel.submitReport(request)
+                                            },
+                                            reportUiState = reportUiState,
+                                            onDelete = { log ->
+                                                viewModel.deleteCallLog(log.id)
+                                            },
+                                            onAddContactClick = {
+                                                selectedCallLog = it
+                                                showAddContactDialog = true
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        ContactTab.Contacts -> {
+                            if (uiState.filteredContacts.isEmpty()) {
+                                item { EmptyState("Chưa có liên hệ") }
+                            } else {
+                                items(uiState.filteredContacts) { contact ->
+                                    ContactItem(contact, openCallLogDetail) { selected ->
+                                        handleCallRequest(selected.phoneNumber, selected.name)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if (showAddContactDialog && selectedCallLog != null) {
+                AddContactDialog(
+                    phoneNumber = selectedCallLog!!.phoneNumber,
+                    initialName = selectedCallLog!!.contactName,
+                    onDismiss = {
                         showAddContactDialog = false
                         selectedCallLog = null
-                    } else {
-                        // lưu tạm name nếu cần
-                        selectedCallLog = selectedCallLog!!.copy(contactName = name)
-                        writeContactPermissionLauncher.launch(Manifest.permission.WRITE_CONTACTS)
-                    }
-                }
+                    },
+                    onConfirm = { name ->
+                        if (
+                            ContextCompat.checkSelfPermission(
+                                context,
+                                Manifest.permission.WRITE_CONTACTS
+                            ) == PackageManager.PERMISSION_GRANTED
+                        ) {
+                            viewModel.addContactToPhoneBook(
+                                name = name,
+                                phoneNumber = selectedCallLog!!.phoneNumber
+                            )
 
-            )
+                            showAddContactDialog = false
+                            selectedCallLog = null
+                        } else {
+                            // lưu tạm name nếu cần
+                            selectedCallLog = selectedCallLog!!.copy(contactName = name)
+                            writeContactPermissionLauncher.launch(Manifest.permission.WRITE_CONTACTS)
+                        }
+                    }
+
+                )
+            }
+
         }
 
-    }
-
-    uiState.scamAlert?.let { alert ->
-        ScamWarningDialog(
-            alert = alert,
-            onDismiss = viewModel::dismissScamAlert,
-            onContinue = viewModel::confirmScamCall
-        )
+        uiState.scamAlert?.let { alert ->
+            ScamWarningDialog(
+                alert = alert,
+                onDismiss = viewModel::dismissScamAlert,
+                onContinue = viewModel::confirmScamCall
+            )
+        }
+        // 2️⃣ DialPad overlay (ĐẶT Ở ĐÂY)
+        if (showDialPad) {
+            DialPadBottomSheet(
+                onDismiss = { showDialPad = false },
+                onCall = { phone ->
+                    showDialPad = false
+                    handleCallRequest(phone, null)
+                }
+            )
+        }
     }
 }
+
+@Composable
+fun DialPadBottomSheet(
+    onDismiss: () -> Unit,
+    onCall: (String) -> Unit
+) {
+    var phone by remember { mutableStateOf("") }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.5f)) // nền mờ
+            .clickable(
+                indication = null,
+                interactionSource = remember { MutableInteractionSource() }
+            ) { onDismiss() } // bấm ngoài để đóng
+    ) {
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .heightIn(max = 520.dp) // 👈 KHÔNG che hết
+                .clip(MaterialTheme.shapes.extraLarge)
+                .background(Color(0xFF1C1C1E))
+                .padding(16.dp)
+                .pointerInput(Unit) {},
+                horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+
+            // ⬆️ Thanh kéo
+            Box(
+                modifier = Modifier
+                    .width(36.dp)
+                    .height(4.dp)
+                    .clip(CircleShape)
+                    .background(Color.Gray)
+            )
+
+            Spacer(Modifier.height(12.dp))
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+            ) {
+                Text(
+                    text = phone.ifBlank { "Nhập số" },
+                    color = Color.White,
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.align(Alignment.Center)
+                )
+
+                IconButton(
+                    onClick = {
+                        if (phone.isNotEmpty()) phone = phone.dropLast(1)
+                    },
+                    modifier = Modifier.align(Alignment.CenterEnd)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Backspace,
+                        contentDescription = "Delete",
+                        tint = Color.White
+                    )
+                }
+            }
+
+
+
+            Spacer(Modifier.height(16.dp))
+
+            DialPad(
+                onNumberClick = { phone += it },
+            )
+
+            Spacer(Modifier.height(20.dp))
+
+            Button(
+                onClick = { if (phone.isNotBlank()) onCall(phone) },
+                modifier = Modifier.size(80.dp),
+                shape = CircleShape,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF2ECC71)
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Call,
+                    contentDescription = "Call",
+                    tint = Color.Black,
+                    modifier = Modifier.size(32.dp)
+                )
+            }
+
+        }
+    }
+}
+
+@Composable
+fun DialPad(
+    onNumberClick: (String) -> Unit,
+) {
+    val keys = listOf(
+        listOf("1","2","3"),
+        listOf("4","5","6"),
+        listOf("7","8","9"),
+        listOf("*","0","#")
+    )
+
+    Column {
+        keys.forEach { row ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                row.forEach { key ->
+                    DialKey(key) { onNumberClick(key) }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+        }
+    }
+}
+@Composable
+fun DialKey(text: String, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(72.dp)
+            .clip(CircleShape)
+            .background(Color(0xFF2C2C2E))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(text, color = Color.White, fontSize = 24.sp)
+    }
+}
+
 
 fun isDefaultDialer(context: Context): Boolean {
     val telecomManager =
@@ -752,7 +917,9 @@ private fun ScamWarningDialog(
                 Text("Huỷ", color = Color.White)
             }
         }
+
     )
+
 }
 
 @RequiresApi(Build.VERSION_CODES.O)

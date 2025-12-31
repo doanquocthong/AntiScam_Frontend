@@ -115,7 +115,13 @@ fun MessageDetailScreen(
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             items(messages) { msg ->
-                MessageBubble(message = msg)
+                MessageBubble(
+                    message = msg,
+                    scanState = viewModel.scanStates[msg.id] ?: ScanState.IDLE,
+                    onScanClick = {
+                        viewModel.scanMessage(msg)
+                    }
+                )
             }
         }
     }

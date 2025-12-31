@@ -10,6 +10,7 @@ import androidx.core.content.ContextCompat
 import com.example.antiscam.data.dao.MessageDao
 import com.example.antiscam.data.database.AppDatabase
 import com.example.antiscam.data.model.Message
+import com.example.antiscam.data.model.request.ScamPredictRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
@@ -20,7 +21,7 @@ class MessageRepository(
 
     private val database = AppDatabase.getDatabase(appContext)
     private val messageDao = database.messageDao()
-
+    val scamCheckRepository = ScamCheckRepository()
 
     fun getAllMessages(): Flow<List<Message>> {
         return messageDao.getAllMessages()
@@ -49,18 +50,10 @@ class MessageRepository(
             return@withContext
         }
 
-        val prefs = appContext.getSharedPreferences(
-            "sms_prefs",
-            Context.MODE_PRIVATE
-        )
-
-        val lastSyncedDate = prefs.getLong("last_sms_date", 0L)
-
         val resolver = appContext.contentResolver
-        val smsUri = Telephony.Sms.CONTENT_URI
 
         val cursor = resolver.query(
-            smsUri,
+            Telephony.Sms.CONTENT_URI,
             arrayOf(
                 Telephony.Sms._ID,
                 Telephony.Sms.ADDRESS,
@@ -69,13 +62,12 @@ class MessageRepository(
                 Telephony.Sms.TYPE,
                 Telephony.Sms.READ
             ),
-            "${Telephony.Sms.DATE} > ?",
-            arrayOf(lastSyncedDate.toString()),
+            null,
+            null,
             "${Telephony.Sms.DATE} ASC"
         )
 
-        val messagesToInsert = mutableListOf<Message>()
-        var newestDate = lastSyncedDate
+        val messages = mutableListOf<Message>()
 
         cursor?.use { c ->
             val idIdx = c.getColumnIndexOrThrow(Telephony.Sms._ID)
@@ -86,61 +78,144 @@ class MessageRepository(
             val readIdx = c.getColumnIndexOrThrow(Telephony.Sms.READ)
 
             while (c.moveToNext()) {
-//                val systemId = c.getLong(idIdx)
-                val address = c.getString(addressIdx) ?: ""
-                val body = c.getString(bodyIdx) ?: ""
-                val date = c.getLong(dateIdx)
-                val type = c.getInt(typeIdx)
-                val isRead = c.getInt(readIdx) == 1
+                val systemId = c.getLong(idIdx)
 
-                newestDate = maxOf(newestDate, date)
-
-                messagesToInsert.add(
+                messages.add(
                     Message(
-                        address = address,
+                        systemSmsId = systemId,
+                        address = c.getString(addressIdx) ?: "",
                         contactName = null,
-                        body = body,
-                        date = date,
-                        type = type,
-                        isScam = false,
-                        isSentByUser = type == Telephony.Sms.MESSAGE_TYPE_SENT,
-                        isRead = isRead
+                        body = c.getString(bodyIdx) ?: "",
+                        date = c.getLong(dateIdx),
+                        type = c.getInt(typeIdx),
+                        isScamNumber = false,
+                        isScamMessage = false,
+                        isSentByUser = c.getInt(typeIdx) == Telephony.Sms.MESSAGE_TYPE_SENT,
+                        isRead = c.getInt(readIdx) == 1
                     )
                 )
             }
         }
 
-        if (messagesToInsert.isNotEmpty()) {
-            messageDao.insertMessages(messagesToInsert)
+        messageDao.insertMessages(messages)
 
-            prefs.edit().putLong("last_sms_date", newestDate).apply()
-
-            Log.d(
-                "MessageRepository",
-                "Inserted ${messagesToInsert.size} new messages"
-            )
-        }
+        Log.d("MessageRepository", "Sync system SMS done: ${messages.size}")
     }
+
     suspend fun insertIncomingSms(
+        systemSmsId: Long,
         address: String,
         body: String,
-        timestamp: Long
+        timestamp: Long,
+        isRead: Boolean
     ) = withContext(Dispatchers.IO) {
+
         val message = Message(
+            systemSmsId = systemSmsId,
             address = address,
             contactName = null,
             body = body,
             date = timestamp,
             type = Telephony.Sms.MESSAGE_TYPE_INBOX,
-            isScam = false,
             isSentByUser = false,
-            isRead = false
+            isRead = isRead
         )
 
         messageDao.insertMessage(message)
 
-        Log.d("MessageRepository", "Inserted incoming SMS from $address")
+        Log.d("MessageRepository", "Inserted incoming SMS systemId=$systemSmsId")
     }
+    fun formatPhoneNumberForApi(rawNumber: String): String {
+        var formatted = rawNumber.trim()
+
+        // Nếu bắt đầu bằng +84, thay bằng 0
+        if (formatted.startsWith("+84")) {
+            formatted = "0" + formatted.removePrefix("+84")
+        }
+
+        // Nếu bắt đầu bằng 84 không dấu + (trường hợp khác), cũng thay thành 0
+        else if (formatted.startsWith("84")) {
+            formatted = "0" + formatted.removePrefix("84")
+        }
+
+        // Có thể thêm các xử lý loại bỏ khoảng trắng, dấu, ký tự không hợp lệ nếu cần
+
+        return formatted
+    }
+
+    suspend fun handleIncomingSms(
+        systemSmsId: Long,
+        address: String,
+        body: String,
+        timestamp: Long
+    ) = withContext(Dispatchers.IO) {
+
+        Log.d("MessageRepository", "HandleIncomingSms id=$systemSmsId")
+
+        var message = messageDao.getBySystemSmsId(systemSmsId)
+
+        // 1️⃣ Insert nếu chưa tồn tại
+        if (message == null) {
+            messageDao.insertMessage(
+                Message(
+                    systemSmsId = systemSmsId,
+                    address = address,
+                    body = body,
+                    date = timestamp,
+                    type = Telephony.Sms.MESSAGE_TYPE_INBOX,
+                    isMessageChecked = false,
+                    isPhoneChecked = false
+                )
+            )
+            message = messageDao.getBySystemSmsId(systemSmsId)
+        }
+
+        if (message == null) {
+            Log.e("MessageRepository", "Message not found after insert")
+            return@withContext
+        }
+
+        // 2️⃣ Check nội dung nếu CHƯA check
+        if (!message.isMessageChecked) {
+            Log.d("MessageRepository", "Checking MESSAGE scam")
+
+            val response = scamCheckRepository.checkMessage(
+                ScamPredictRequest(text = message.body)
+            )
+
+            if (response?.data != null) {
+                val isScam = response.data.label == "scam"
+                messageDao.updateMessageScamResult(systemSmsId, isScam)
+                Log.d("MessageRepository", "Message check DONE: $isScam")
+            } else {
+                Log.w("MessageRepository", "Message check FAILED → retry later")
+            }
+        } else {
+            Log.d("MessageRepository", "Message already checked → skip")
+        }
+
+        // 3️⃣ Check số điện thoại nếu CHƯA check
+        if (!message.isPhoneChecked) {
+            val formatted = formatPhoneNumberForApi(message.address)
+            Log.d("MessageRepository", "Checking PHONE scam: $formatted")
+
+            val response = scamCheckRepository.checkPhoneNumber(formatted)
+
+            if (response?.data != null) {
+                val isScam = response.data.isScam == true
+                messageDao.updatePhoneScamResult(systemSmsId, isScam)
+                Log.d("MessageRepository", "Phone check DONE: $isScam")
+            } else {
+                Log.w("MessageRepository", "Phone check FAILED → retry later")
+            }
+        } else {
+            Log.d("MessageRepository", "Phone already checked → skip")
+        }
+    }
+
+
+
+
 
 
 

@@ -11,10 +11,10 @@ interface MessageDao {
     @Query("SELECT * FROM messages ORDER BY date DESC")
     fun getAllMessages(): Flow<List<Message>>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertMessage(message: Message)
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertMessages(messages: List<Message>)
 
     @Query("DELETE FROM messages")
@@ -38,5 +38,37 @@ interface MessageDao {
     ORDER BY date ASC
     """)
     fun getMessagesByAddress(address: String): Flow<List<Message>>
+
+    @Query("""
+    SELECT EXISTS(
+    SELECT 1 FROM messages
+    WHERE systemSmsId = :systemId
+        )
+    """)
+        suspend fun existsBySystemId(systemId: Long): Boolean
+    @Query("SELECT * FROM messages WHERE systemSmsId = :systemSmsId LIMIT 1")
+    suspend fun getBySystemSmsId(systemSmsId: Long): Message?
+    @Query("""
+    UPDATE messages
+    SET 
+        isScamMessage = :isScam,
+        isMessageChecked = 1
+    WHERE systemSmsId = :systemSmsId
+    """)
+    suspend fun updateMessageScamResult(
+        systemSmsId: Long,
+        isScam: Boolean
+    )
+    @Query("""
+    UPDATE messages
+    SET 
+        isScamNumber = :isScam,
+        isPhoneChecked = 1
+    WHERE systemSmsId = :systemSmsId
+    """)
+    suspend fun updatePhoneScamResult(
+        systemSmsId: Long,
+        isScam: Boolean
+    )
 
 }

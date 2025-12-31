@@ -63,7 +63,18 @@ fun ReportDialog(
             else -> p
         }
     }
+    fun normalizeVietnamPhone(phone: String): String {
+        val p = phone.trim().replace(" ", "").replace("-", "")
 
+        return when {
+            p.startsWith("+84") -> "0" + p.drop(3)
+            p.startsWith("84") -> "0" + p.drop(2)
+            p.startsWith("0") -> p
+            else -> p
+        }
+    }
+    val normalizedPhone = normalizeVietnamPhone(phone)
+    val normalizedReporterPhone = normalizeVietnamPhone(ownerPhone)
     LaunchedEffect(uiState.isSuccess) {
         if (uiState.isSuccess) {
             onDismiss()
@@ -236,7 +247,7 @@ fun ReportDialog(
                                 onSubmit(
                                     ReportRequest(
                                         reporterName = reporterName,
-                                        reporterPhone = ownerPhone,
+                                        reporterPhone = normalizedReporterPhone,
                                         phone = phone,
                                         email = email,
                                         scamType = scamType,
