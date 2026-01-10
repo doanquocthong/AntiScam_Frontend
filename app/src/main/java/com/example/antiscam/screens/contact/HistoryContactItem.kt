@@ -388,7 +388,7 @@ fun HistoryContactItem(
                         ActionItem(Icons.Default.PersonAdd, "Thêm số vào danh bạ", {onAddContactClick(groupedCallLog) })
                         Divider(color = Color.Black.copy(alpha = 0.3f))
                     }
-                    ActionItem(Icons.Default.Message, "Tin nhắn", {})
+//                    ActionItem(Icons.Default.Message, "Tin nhắn", {})
                     Divider(color = Color.Black.copy(alpha = 0.3f))
                     ActionItem(Icons.Default.History, "Nhật ký", {openCallLogDetail(groupedCallLog.phoneNumber)})
                 }

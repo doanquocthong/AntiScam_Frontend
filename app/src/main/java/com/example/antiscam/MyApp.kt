@@ -8,6 +8,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import androidx.core.content.edit
+import com.example.antiscam.observer.CallLogObserver
 import com.example.antiscam.observer.SmsObserver
 import kotlin.math.log
 
@@ -15,9 +16,10 @@ class MyApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        Log.d("MyApp", "Application onCreate")
         ServiceLocator.init(this)
-        SmsObserver.register(this)
+//        SmsObserver.register(this)
+//        CallLogObserver.register(this)
+
 //        val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
 //        val firstSyncDone = prefs.getBoolean("first_sync_done", false)
 //

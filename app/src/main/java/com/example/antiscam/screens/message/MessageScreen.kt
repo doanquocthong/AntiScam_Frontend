@@ -172,8 +172,6 @@ fun MessageScreen(
                         .fillMaxWidth()
                         .padding(horizontal = 12.dp, vertical = 8.dp)
                 ) {
-                    Icon(Icons.Default.Menu, contentDescription = null, tint = Color.Gray)
-                    Spacer(modifier = Modifier.width(8.dp))
 
                     TextField(
                         value = "",
@@ -197,11 +195,6 @@ fun MessageScreen(
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
-
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(text = "Đã đọc", selected = true, onClick = {})
-                    FilterChip(text = "Chưa đọc", selected = false, onClick = {})
-                }
             }
         }
     ) { paddingValues ->

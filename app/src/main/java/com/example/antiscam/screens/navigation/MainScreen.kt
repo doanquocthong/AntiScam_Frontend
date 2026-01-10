@@ -1,7 +1,7 @@
 package com.example.antiscam.screens.navigation
-import android.R.attr.layoutDirection
+import android.os.Build
 import android.util.Log
-import androidx.compose.foundation.background
+import androidx.annotation.RequiresApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -16,19 +16,16 @@ import androidx.compose.material.icons.filled.Message
 import androidx.compose.runtime.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import com.example.antiscam.screens.contact.ContactScreen
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.navigation.NavController
 import com.example.antiscam.screens.message.MessageDetailScreen
 import com.example.antiscam.screens.message.MessageScreen
 
+@RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun MainScreen(navController: NavController) {
-    var selectedTab by remember { mutableStateOf(0) }
+    var selectedTab by remember { mutableIntStateOf(0) }
 
     // 👉 state để mở màn hình chi tiết
     var openedAddress by remember { mutableStateOf<String?>(null) }

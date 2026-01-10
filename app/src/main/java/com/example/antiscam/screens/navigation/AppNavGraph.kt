@@ -1,6 +1,8 @@
 package com.example.antiscam.screens.navigation
 
+import android.os.Build
 import androidx.activity.ComponentActivity
+import androidx.annotation.RequiresApi
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
@@ -22,6 +24,7 @@ import com.example.antiscam.screens.message.MessageDetailScreen
 import com.example.antiscam.screens.message.MessageScreen
 import com.google.firebase.auth.FirebaseAuth
 
+@RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun AppNavGraph() {
     val navController = rememberNavController()
@@ -72,16 +75,34 @@ fun AppNavGraph() {
             )
         }
 
+//        composable(
+//            "message/{address}",
+//            arguments = listOf(navArgument("address") { type = NavType.StringType })
+//        ) {
+//            val address = it.arguments!!.getString("address")!!
+//            MessageDetailScreen(
+//                address = address,
+//                onBack = { navController.popBackStack() },
+//                reporterPhone = TODO(),
+//                reportUiState = TODO(),
+//                onReportClick = TODO()
+//            )
+//        }
         composable(
-            "message/{address}",
-            arguments = listOf(navArgument("address") { type = NavType.StringType })
-        ) {
-            val address = it.arguments!!.getString("address")!!
+            route = "message/{address}",
+            arguments = listOf(
+                navArgument("address") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+
+            val address = backStackEntry.arguments!!.getString("address")!!
+
             MessageDetailScreen(
                 address = address,
                 onBack = { navController.popBackStack() }
             )
         }
+
         composable(
             route = "call_log/{phoneNumber}",
             arguments = listOf(navArgument("phoneNumber") { type = NavType.StringType })
